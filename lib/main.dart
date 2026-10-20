@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mcri_residents_app/screens/conversation_detail_screen.dart';
 import 'package:provider/provider.dart';
 
 import 'providers/auth_provider.dart';
@@ -84,6 +85,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       _webSocketProvider.disconnect();
       _unreadProvider.reset();
       DeviceRegistrationService.unregister();
+      ConversationDetailScreen.clearCache();
     }
   }
 

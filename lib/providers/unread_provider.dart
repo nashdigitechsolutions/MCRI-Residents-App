@@ -13,6 +13,7 @@ class UnreadProvider extends ChangeNotifier {
 
   int get unreadNotifications => _unreadNotifications;
   int get unreadConversations => _chatBadgeEnabled ? _unreadConversations : 0;
+  int? get activeConversationId => _activeConversationId;
 
   void setChatBadgeEnabled(bool enabled) {
     if (_chatBadgeEnabled == enabled) return;

@@ -127,7 +127,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         : (user?.username ?? 'Resident');
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Profile')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [

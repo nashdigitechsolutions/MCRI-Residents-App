@@ -87,6 +87,20 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
     super.dispose();
   }
 
+  /// Flips a row to "read" locally, without waiting for a refetch.
+  void _markReadLocally(int id) {
+    if (!mounted) return;
+    setState(() {
+      _conversations = _conversations.map((c) {
+        if (c.conversationId != id) return c;
+        final now = DateTime.now();
+        final at = c.lastActivityAt ?? c.lastMessageAt;
+        final readAt = (at != null && at.isAfter(now)) ? at : now;
+        return c.copyWith(myLastReadAt: readAt);
+      }).toList();
+    });
+  }
+
   Future<void> _fetch({bool showLoading = true}) async {
     if (showLoading) setState(() => _loading = true);
     try {
@@ -163,12 +177,18 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
 
   void _openConversation(Conversation c) {
     context.read<UnreadProvider>().markConversationRead(c.conversationId);
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) =>
-            ConversationDetailScreen(conversationId: c.conversationId),
-      ),
-    );
+    _markReadLocally(c.conversationId);
+    Navigator.of(context)
+        .push(
+          MaterialPageRoute(
+            builder: (_) => ConversationDetailScreen(
+              conversationId: c.conversationId,
+              initial: c,
+            ),
+          ),
+        )
+        // Refresh quietly on return so the preview shows what you just sent.
+        .then((_) => _fetch(showLoading: false));
   }
 
   Future<void> _openNewConversationSheet() async {
