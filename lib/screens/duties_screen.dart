@@ -67,60 +67,92 @@ class _DutiesScreenState extends State<DutiesScreen>
   /// Each source loads and fails independently — a broken roster route
   /// (e.g. not deployed yet) never blanks out duties, and vice versa.
   Future<void> _loadAll() async {
-    setState(() => _loading = true);
+  if (!mounted) return;
 
-    try {
-      final data = await ApiService.get('/duties');
-      setState(
-        () => _duties = (data as List)
-            .map((j) => Duty.fromJson(j as Map<String, dynamic>))
-            .toList(),
-      );
-    } catch (e) {
-      _notify('Could not load duties', isError: true);
-    }
+  setState(() => _loading = true);
 
-    try {
-      final data = await ApiService.get('/duty-roster');
-      setState(
-        () => _roster = (data as List)
-            .map((j) => RosterEntry.fromJson(j as Map<String, dynamic>))
-            .toList(),
-      );
-    } on ApiException catch (e) {
-      _notify(
-        e.statusCode == 404
-            ? "Duty roster route not found — check it's registered on the backend"
-            : 'Could not load the duty roster',
-        isError: true,
-      );
-    } catch (e) {
-      _notify('Could not load the duty roster', isError: true);
-    }
+  // Read the admin status before any async operations.
+  final isAdmin = _isAdmin;
 
-    if (_isAdmin) {
-      try {
-        final data = await ApiService.get('/residents');
-        setState(
-          () => _residents = (data as List)
-              .map((j) => Resident.fromJson(j as Map<String, dynamic>))
-              .toList(),
-        );
-      } catch (e) {
-        // non-fatal — room column just shows blank
-      }
-      try {
-        final data = await ApiService.get('/users');
-        setState(
-          () => _directory = (data as List).cast<Map<String, dynamic>>(),
-        );
-      } catch (e) {
-        _notify('Could not load the user directory', isError: true);
-      }
-    }
+  try {
+    final data = await ApiService.get('/duties');
 
-    setState(() => _loading = false);
+    if (!mounted) return;
+
+    setState(
+      () => _duties = (data as List)
+          .map((j) => Duty.fromJson(j as Map<String, dynamic>))
+          .toList(),
+    );
+  } catch (e) {
+    if (!mounted) return;
+    _notify('Could not load duties', isError: true);
   }
+
+  if (!mounted) return;
+
+  try {
+    final data = await ApiService.get('/duty-roster');
+
+    if (!mounted) return;
+
+    setState(
+      () => _roster = (data as List)
+          .map((j) => RosterEntry.fromJson(j as Map<String, dynamic>))
+          .toList(),
+    );
+  } on ApiException catch (e) {
+    if (!mounted) return;
+
+    _notify(
+      e.statusCode == 404
+          ? "Duty roster route not found — check it's registered on the backend"
+          : 'Could not load the duty roster',
+      isError: true,
+    );
+  } catch (e) {
+    if (!mounted) return;
+    _notify('Could not load the duty roster', isError: true);
+  }
+
+  if (!mounted) return;
+
+  if (isAdmin) {
+    try {
+      final data = await ApiService.get('/residents');
+
+      if (!mounted) return;
+
+      setState(
+        () => _residents = (data as List)
+            .map((j) => Resident.fromJson(j as Map<String, dynamic>))
+            .toList(),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      // Non-fatal — room column just shows blank.
+    }
+
+    if (!mounted) return;
+
+    try {
+      final data = await ApiService.get('/users');
+
+      if (!mounted) return;
+
+      setState(
+        () => _directory = (data as List).cast<Map<String, dynamic>>(),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _notify('Could not load the user directory', isError: true);
+    }
+  }
+
+  if (!mounted) return;
+
+  setState(() => _loading = false);
+}
 
   void _notify(String message, {bool isError = false}) {
     if (!mounted) return;

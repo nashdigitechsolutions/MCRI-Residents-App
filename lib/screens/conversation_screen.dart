@@ -212,27 +212,26 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(DateFormat.yMMMd().format(DateTime.now())),
-        actions: [
-          IconButton(
-            onPressed: _openNewConversationSheet,
-            icon: const Icon(Icons.add_comment_outlined),
-          ),
-        ],
-      ),
-      body: _loading
+    
+return Scaffold(
+  body: Stack(
+    children: [
+      _loading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: () => _fetch(showLoading: false),
               child: ListView(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  MediaQuery.of(context).padding.top + 76,
+                  16,
+                  24,
+                ),
                 children: [
                   TextField(
                     onChanged: (v) => setState(() => _search = v),
                     decoration: InputDecoration(
-                      hintText: 'Search conversations…',
+                      hintText: 'Search conversations...',
                       prefixIcon: Icon(
                         Icons.search,
                         size: 19,
@@ -240,14 +239,17 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                       ),
                       filled: true,
                       fillColor: colors.surface,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                      contentPadding:
+                          const EdgeInsets.symmetric(vertical: 12),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(999),
-                        borderSide: BorderSide(color: colors.outlineVariant),
+                        borderSide:
+                            BorderSide(color: colors.outlineVariant),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(999),
-                        borderSide: BorderSide(color: colors.outlineVariant),
+                        borderSide:
+                            BorderSide(color: colors.outlineVariant),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(999),
@@ -265,7 +267,10 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                       ),
                       child: Text(
                         _error!,
-                        style: const TextStyle(color: _red, fontSize: 12.5),
+                        style: const TextStyle(
+                          color: _red,
+                          fontSize: 12.5,
+                        ),
                       ),
                     ),
                   ],
@@ -305,17 +310,47 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                     )
                   else
                     for (final c in _filtered)
-                      _ConversationRow(
-                        conversation: c,
-                        deletable: _canDelete(c),
-                        deleting: _deletingId == c.conversationId,
-                        onTap: () => _openConversation(c),
-                        onDelete: () => _delete(c),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: _ConversationRow(
+                          conversation: c,
+                          deletable: _canDelete(c),
+                          deleting: _deletingId == c.conversationId,
+                          onTap: () => _openConversation(c),
+                          onDelete: () => _delete(c),
+                        ),
                       ),
                 ],
               ),
             ),
-    );
+
+      Positioned(
+        top: MediaQuery.of(context).padding.top + 12,
+        right: 16,
+        child: Material(
+          color: _accent,
+          elevation: 4,
+          shadowColor: _accent.withValues(alpha: 0.3),
+          borderRadius: BorderRadius.circular(16),
+          child: InkWell(
+            onTap: _openNewConversationSheet,
+            borderRadius: BorderRadius.circular(16),
+            child: const SizedBox(
+              width: 48,
+              height: 48,
+              child: Icon(
+                Icons.add_comment_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
+            ),
+          ),
+        ),
+      ),
+    ],
+  ),
+);
+
   }
 }
 
@@ -334,127 +369,156 @@ class _ConversationRow extends StatelessWidget {
     required this.onDelete,
   });
 
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final unread = conversation.isUnread;
+  
+@override
+Widget build(BuildContext context) {
+  final colors = Theme.of(context).colorScheme;
+  final unread = conversation.isUnread;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
+  return Dismissible(
+    key: ValueKey(conversation.conversationId),
+    direction: deletable
+        ? DismissDirection.endToStart
+        : DismissDirection.none,
+    confirmDismiss: (_) async {
+      if (deleting) return false;
+      onDelete();
+      return false;
+    },
+    background: const SizedBox.shrink(),
+    secondaryBackground: Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.only(right: 22),
+      alignment: Alignment.centerRight,
       decoration: BoxDecoration(
-        color: unread ? _accent.withValues(alpha: 0.05) : colors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: colors.outlineVariant),
+        color: const Color(0xFFEF4444),
+        borderRadius: BorderRadius.circular(14),
       ),
+      child: const Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.delete_outline_rounded,
+            color: Colors.white,
+            size: 25,
+          ),
+          SizedBox(height: 4),
+          Text(
+            'Delete',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    ),
+    child: Material(
+      color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(18),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.symmetric(
+            horizontal: 4,
+            vertical: 12,
+          ),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Stack(
                 children: [
                   CircleAvatar(
-                    radius: 22,
-                    backgroundColor: _accent,
+                    radius: 27,
+                    backgroundColor: _accent.withValues(alpha: 0.12),
                     child: Text(
                       initialsFor(conversation.displayName),
                       style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
+                        color: _accent,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                   ),
                   if (unread)
                     Positioned(
                       right: 0,
-                      top: 0,
+                      bottom: 0,
                       child: Container(
-                        width: 11,
-                        height: 11,
+                        width: 13,
+                        height: 13,
                         decoration: BoxDecoration(
                           color: _accent,
                           shape: BoxShape.circle,
-                          border: Border.all(color: colors.surface, width: 2),
+                          border: Border.all(
+                            color: colors.surface,
+                            width: 2,
+                          ),
                         ),
                       ),
                     ),
                 ],
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 13),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            conversation.displayName,
-                            style: TextStyle(
-                              fontSize: 14.5,
-                              fontWeight: unread
-                                  ? FontWeight.w800
-                                  : FontWeight.w600,
-                              color: colors.onSurface,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        if (conversation.lastActivityAt != null)
-                          Text(
-                            _relativeTime(conversation.lastActivityAt!),
-                            style: TextStyle(
-                              fontSize: 10.5,
-                              color: unread ? _accent : colors.onSurfaceVariant,
-                              fontWeight: unread
-                                  ? FontWeight.w700
-                                  : FontWeight.w400,
-                            ),
-                          ),
-                      ],
+                    Text(
+                      conversation.displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: unread
+                            ? FontWeight.w700
+                            : FontWeight.w600,
+                        color: colors.onSurface,
+                      ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 5),
                     Text(
                       conversation.activityPreview,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 12.5,
                         color: unread
                             ? colors.onSurface
                             : colors.onSurfaceVariant,
-                        fontWeight: unread ? FontWeight.w500 : FontWeight.w400,
+                        fontWeight: unread
+                            ? FontWeight.w600
+                            : FontWeight.w400,
                       ),
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
               ),
-              if (deletable)
-                deleting
-                    ? SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: colors.onSurfaceVariant,
-                        ),
-                      )
-                    : IconButton(
-                        onPressed: onDelete,
-                        icon: Icon(
-                          Icons.delete_outline,
-                          size: 18,
-                          color: colors.onSurfaceVariant,
-                        ),
-                        visualDensity: VisualDensity.compact,
-                      ),
+              const SizedBox(width: 10),
+              if (deleting)
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                  ),
+                )
+              else if (conversation.lastActivityAt != null)
+                Text(
+                  _relativeTime(conversation.lastActivityAt!),
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
             ],
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
+
 
   String _relativeTime(DateTime dt) {
     final diff = DateTime.now().difference(dt);

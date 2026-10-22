@@ -62,9 +62,32 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _loadAvailabilityCache();
     _loadDashboard();
+    _loadUsername();
   }
 
   String _cacheKey(int? userId) => 'mcri_profile_cache_${userId ?? 'anon'}';
+  String? _username;
+
+  Future<void> _loadUsername() async {
+  try {
+    final data = await ApiService.get('/profile');
+
+    debugPrint('PROFILE RESPONSE: $data');
+
+    final profile = data as Map<String, dynamic>;
+    final username = profile['username']?.toString().trim();
+
+    if (!mounted) return;
+
+    if (username != null && username.isNotEmpty) {
+      setState(() {
+        _username = username;
+      });
+    }
+  } catch (e) {
+    debugPrint('Could not load username: $e');
+  }
+}
 
   Future<void> _loadAvailabilityCache() async {
     final userId = context.read<AuthProvider>().user?.userId;
@@ -234,11 +257,21 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   String get _greeting {
-    final hour = DateTime.now().hour;
-    if (hour < 12) return 'Good morning';
-    if (hour < 18) return 'Good afternoon';
-    return 'Good evening';
-  }
+  final hour = DateTime.now().hour;
+
+  final username = (_username ??
+          context.read<AuthProvider>().user?.username ??
+          '')
+      .trim();
+
+  final name = username.isNotEmpty
+      ? ', ${username.split(' ').first}'
+      : '';
+
+  if (hour < 12) return 'Good morning$name';
+  if (hour < 18) return 'Good afternoon$name';
+  return 'Good evening$name';
+}
 
   @override
   Widget build(BuildContext context) {
@@ -274,69 +307,130 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    DateFormat('EEEE, MMMM d')
-                                        .format(DateTime.now())
-                                        .toUpperCase(),
-                                    style: const TextStyle(
-                                      color: Colors.white54,
-                                      fontSize: 10.5,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: 0.8,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '$_greeting${user?.username != null ? ', ${user!.username}' : ''}',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                  if (isAdmin) ...[
-                                    const SizedBox(height: 2),
-                                    const Text(
-                                      'Admin dashboard',
-                                      style: TextStyle(
-                                        color: Colors.white60,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                            Row(
-                              children: [
-                                _headerIconButton(
-                                  icon: isDark
-                                      ? Icons.wb_sunny_outlined
-                                      : Icons.dark_mode_outlined,
-                                  active: isDark,
-                                  onTap: () => _toggleDarkMode(!isDark),
-                                ),
-                                const SizedBox(width: 8),
-                                _headerIconButton(
-                                  icon: Icons.meeting_room_outlined,
-                                  active: _isAvailable,
-                                  disabled: _savingAvailability,
-                                  onTap: () =>
-                                      _toggleAvailability(!_isAvailable),
-                                ),
-                                const SizedBox(width: 8),
-                                _notificationBellButton(unreadCount),
-                              ],
-                            ),
-                          ],
-                        ),
+                        
+Column(
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+    // Top navigation
+    Row(
+      children: [
+        Container(
+          width: 4,
+          height: 28,
+          decoration: BoxDecoration(
+            color: const Color(0xFFE50914),
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'MCRI RES PORTAL',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.5,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                DateFormat('EEEE, MMMM d')
+                    .format(DateTime.now()),
+                style: const TextStyle(
+                  color: Colors.white60,
+                  fontSize: 10,
+                ),
+              ),
+            ],
+          ),
+        ),
+        _headerIconButton(
+          icon: isDark
+              ? Icons.wb_sunny_outlined
+              : Icons.dark_mode_outlined,
+          active: isDark,
+          onTap: () => _toggleDarkMode(!isDark),
+        ),
+        const SizedBox(width: 5),
+        _headerIconButton(
+          icon: Icons.meeting_room_outlined,
+          active: _isAvailable,
+          disabled: _savingAvailability,
+          onTap: () => _toggleAvailability(!_isAvailable),
+        ),
+        const SizedBox(width: 5),
+        _notificationBellButton(unreadCount),
+      ],
+    ),
+
+    const SizedBox(height: 7),
+    Text(
+      '$_greeting 👋',
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 25,
+        fontWeight: FontWeight.w900,
+        letterSpacing: -0.8,
+        height: 1.15,
+      ),
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+    ),
+    const SizedBox(height: 8),
+    Text(
+      isAdmin
+          ? 'Your community. Your overview.'
+          : 'Everything happening in your community.',
+      style: const TextStyle(
+        color: Colors.white70,
+        fontSize: 12,
+        height: 1.5,
+      ),
+    ),
+
+    if (isAdmin) ...[
+      const SizedBox(height: 12),
+      Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 10,
+          vertical: 6,
+        ),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE50914).withValues(alpha: 0.14),
+          border: Border.all(
+            color: const Color(0xFFE50914).withValues(alpha: 0.4),
+          ),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.shield_outlined,
+              color: Color(0xFFFF555D),
+              size: 14,
+            ),
+            SizedBox(width: 6),
+            Text(
+              'ADMINISTRATOR',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 9,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ],
+  ],
+),
+
                         const SizedBox(height: 20),
                         _buildStatStrip(isAdmin),
                       ],
@@ -347,319 +441,412 @@ class _HomeScreenState extends State<HomeScreen> {
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (isAdmin && _openMaintenance.isNotEmpty) ...[
-                          _buildAttentionBanner(colors),
-                          const SizedBox(height: 20),
-                        ],
+                      
+children: [
+  // Maintenance alert
+  if (isAdmin && _openMaintenance.isNotEmpty) ...[
+    _buildAttentionBanner(colors),
+    const SizedBox(height: 24),
+  ],
 
-                        if (_myDuties.isNotEmpty) ...[
-                          _sectionHeader(
-                            colors,
-                            Icons.checklist_outlined,
-                            'My duties',
-                            onViewAll: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const DutiesScreen(),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          SizedBox(
-                            height: 76,
-                            child: ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: _myDuties.length,
-                              separatorBuilder: (_, _) =>
-                                  const SizedBox(width: 8),
-                              itemBuilder: (context, i) {
-                                final d = _myDuties[i];
-                                return Container(
-                                  width: 160,
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: colors.surface,
-                                    borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(
-                                      color: colors.outlineVariant,
-                                    ),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        d.title,
-                                        style: TextStyle(
-                                          fontSize: 12.5,
-                                          fontWeight: FontWeight.w600,
-                                          color: colors.onSurface,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 3),
-                                      Text(
-                                        'Due ${DateFormat.MMMd().format(d.assignedDate)}',
-                                        style: TextStyle(
-                                          fontSize: 10.5,
-                                          color: colors.onSurfaceVariant,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(height: 22),
-                        ],
+  // MY DUTIES
+  if (_myDuties.isNotEmpty) ...[
+    _sectionHeader(
+      colors,
+      Icons.checklist_rounded,
+      'My duties',
+      onViewAll: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => const DutiesScreen(),
+        ),
+      ),
+    ),
+    const SizedBox(height: 14),
+    SizedBox(
+      height: 116,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: _myDuties.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 12),
+        itemBuilder: (context, i) {
+          final d = _myDuties[i];
 
-                        _sectionHeader(
-                          colors,
-                          Icons.calendar_today_outlined,
-                          'Upcoming events',
-                          onViewAll: () => Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => const EventsScreen(),
-                            ),
-                          ),
+          return Container(
+            width: 190,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: colors.surface,
+              borderRadius: BorderRadius.circular(22),
+              boxShadow: [
+                BoxShadow(
+                  color: colors.shadow.withValues(alpha: 0.04),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: _accent.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.task_alt_rounded,
+                        color: _accent,
+                        size: 17,
+                      ),
+                    ),
+                    const Spacer(),
+                    Icon(
+                      Icons.arrow_outward_rounded,
+                      size: 16,
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ],
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      d.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: colors.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Due ${DateFormat.MMMd().format(d.assignedDate)}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    ),
+    const SizedBox(height: 28),
+  ],
+
+  // UPCOMING EVENTS
+  _sectionHeader(
+    colors,
+    Icons.calendar_month_rounded,
+    'Upcoming events',
+    onViewAll: () => Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const EventsScreen(),
+      ),
+    ),
+  ),
+  const SizedBox(height: 14),
+
+  if (_events.isEmpty)
+    _emptyCard(colors, 'Nothing scheduled right now.')
+  else
+    Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: colors.shadow.withValues(alpha: 0.035),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          for (int i = 0; i < _events.length; i++) ...[
+            Builder(
+              builder: (context) {
+                final e = _events[i];
+
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 54,
+                        height: 58,
+                        decoration: BoxDecoration(
+                          color: _accent.withValues(alpha: 0.09),
+                          borderRadius: BorderRadius.circular(15),
                         ),
-                        const SizedBox(height: 10),
-                        if (_events.isEmpty)
-                          _emptyCard(colors, 'Nothing scheduled right now.')
-                        else
-                          for (final e in _events)
-                            Container(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: colors.surface,
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(
-                                  color: colors.outlineVariant,
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 42,
-                                    height: 42,
-                                    decoration: BoxDecoration(
-                                      color: _accent.withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(11),
-                                    ),
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Text(
-                                          DateFormat.MMM()
-                                              .format(e.startDate)
-                                              .toUpperCase(),
-                                          style: const TextStyle(
-                                            fontSize: 9,
-                                            fontWeight: FontWeight.w700,
-                                            color: _accent,
-                                          ),
-                                        ),
-                                        Text(
-                                          '${e.startDate.day}',
-                                          style: const TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.bold,
-                                            color: _accent,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          e.title,
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w600,
-                                            color: colors.onSurface,
-                                          ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        if (e.location != null)
-                                          Text(
-                                            e.location!,
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              color: colors.onSurfaceVariant,
-                                            ),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                        const SizedBox(height: 22),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            _sectionHeader(
-                              colors,
-                              Icons.campaign_outlined,
-                              'Latest announcements',
-                            ),
-                            if (isAdmin)
-                              OutlinedButton.icon(
-                                onPressed: _openNewAnnouncementSheet,
-                                icon: const Icon(Icons.add, size: 14),
-                                label: const Text(
-                                  'New',
-                                  style: TextStyle(fontSize: 12),
-                                ),
-                                style: OutlinedButton.styleFrom(
-                                  side: BorderSide(
-                                    color: colors.outlineVariant,
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 6,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(999),
-                                  ),
-                                ),
+                            Text(
+                              DateFormat.MMM()
+                                  .format(e.startDate)
+                                  .toUpperCase(),
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: _accent,
                               ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${e.startDate.day}',
+                              style: const TextStyle(
+                                fontSize: 21,
+                                fontWeight: FontWeight.w800,
+                                color: _accent,
+                              ),
+                            ),
                           ],
                         ),
-                        const SizedBox(height: 10),
-                        if (_announcements.isEmpty)
-                          _emptyCard(
-                            colors,
-                            isAdmin
-                                ? 'No announcements yet.\nUse "New" above to post the first one.'
-                                : 'No announcements yet.',
-                          )
-                        else
-                          for (final a in _announcements)
-                            _AnnouncementCard(
-                              announcement: a,
-                              isAdmin: isAdmin,
-                              reactingKey: _reactingKey,
-                              onReact: (key) => _handleReaction(a, key),
-                              onWhoReacted: () => _openReactionsViewer(a),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              e.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: colors.onSurface,
+                              ),
                             ),
-
-                        const SizedBox(height: 22),
-                        _sectionHeader(
-                          colors,
-                          Icons.grid_view_rounded,
-                          'Quick links',
-                        ),
-                        const SizedBox(height: 10),
-                        GridView.count(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          crossAxisCount: 2,
-                          mainAxisSpacing: 10,
-                          crossAxisSpacing: 10,
-                          childAspectRatio: 1.7,
-                          children: isAdmin
-                              ? [
-                                  _quickLink(
-                                    colors,
-                                    Icons.shield_outlined,
-                                    'Admin dashboard',
-                                    () => Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            const AdminDashboardScreen(),
-                                      ),
-                                    ),
+                            if (e.location != null) ...[
+                              const SizedBox(height: 5),
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.location_on_outlined,
+                                    size: 14,
+                                    color: colors.onSurfaceVariant,
                                   ),
-                                  _quickLink(
-                                    colors,
-                                    Icons.people_outline,
-                                    'Roles',
-                                    () => Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            const AdminRolesScreen(),
-                                      ),
-                                    ),
-                                  ),
-                                  _quickLink(
-                                    colors,
-                                    Icons.meeting_room_outlined,
-                                    'Manage rooms',
-                                    () => Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) => const RoomsScreen(),
-                                      ),
-                                    ),
-                                  ),
-                                  _quickLink(
-                                    colors,
-                                    Icons.checklist_outlined,
-                                    'Manage polls',
-                                    () => Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) => const PollsScreen(),
-                                      ),
-                                    ),
-                                  ),
-                                ]
-                              : [
-                                  _quickLink(
-                                    colors,
-                                    Icons.checklist_outlined,
-                                    'My duties',
-                                    () => Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) => const DutiesScreen(),
-                                      ),
-                                    ),
-                                  ),
-                                  _quickLink(
-                                    colors,
-                                    Icons.build_outlined,
-                                    'Equipment',
-                                    () => Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) => const EquipmentScreen(),
-                                      ),
-                                    ),
-                                  ),
-                                  _quickLink(
-                                    colors,
-                                    Icons.ramen_dining_outlined,
-                                    'Meal polls',
-                                    () => Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) => const PollsScreen(),
-                                      ),
-                                    ),
-                                  ),
-                                  _quickLink(
-                                    colors,
-                                    Icons.menu_book_outlined,
-                                    'House rules',
-                                    () => Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            const HouseRulesScreen(),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      e.location!,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: colors.onSurfaceVariant,
                                       ),
                                     ),
                                   ),
                                 ],
+                              ),
+                            ],
+                          ],
                         ),
-                      ],
+                      ),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        color: colors.onSurfaceVariant,
+                        size: 21,
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+            if (i != _events.length - 1)
+              Divider(
+                height: 1,
+                color: colors.outlineVariant.withValues(alpha: 0.5),
+              ),
+          ],
+        ],
+      ),
+    ),
+
+  const SizedBox(height: 28),
+
+  // ANNOUNCEMENTS
+  Row(
+    children: [
+      Expanded(
+        child: _sectionHeader(
+          colors,
+          Icons.campaign_rounded,
+          'Announcements',
+        ),
+      ),
+      if (isAdmin)
+        FilledButton.icon(
+          onPressed: _openNewAnnouncementSheet,
+          icon: const Icon(Icons.add_rounded, size: 18),
+          label: const Text('Create'),
+          style: FilledButton.styleFrom(
+            backgroundColor: _accent,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            padding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 10,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+        ),
+    ],
+  ),
+  const SizedBox(height: 14),
+
+  if (_announcements.isEmpty)
+    _emptyCard(
+      colors,
+      isAdmin
+          ? 'No announcements yet.\nCreate one to keep everyone informed.'
+          : 'No announcements yet.',
+    )
+  else
+    ..._announcements.map(
+      (a) => Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: _AnnouncementCard(
+          announcement: a,
+          isAdmin: isAdmin,
+          reactingKey: _reactingKey,
+          onReact: (key) => _handleReaction(a, key),
+          onWhoReacted: () => _openReactionsViewer(a),
+        ),
+      ),
+    ),
+
+  const SizedBox(height: 28),
+
+  // QUICK LINKS
+  _sectionHeader(
+    colors,
+    Icons.apps_rounded,
+    'Explore',
+  ),
+  const SizedBox(height: 6),
+  Text(
+    'Everything you need, in one place.',
+    style: TextStyle(
+      fontSize: 13,
+      color: colors.onSurfaceVariant,
+    ),
+  ),
+  const SizedBox(height: 16),
+
+  GridView.count(
+    shrinkWrap: true,
+    physics: const NeverScrollableScrollPhysics(),
+    crossAxisCount: 2,
+    mainAxisSpacing: 12,
+    crossAxisSpacing: 12,
+    childAspectRatio: 1.45,
+    children: isAdmin
+        ? [
+            _quickLink(
+              colors,
+              Icons.shield_outlined,
+              'Admin dashboard',
+              () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const AdminDashboardScreen(),
+                ),
+              ),
+            ),
+            _quickLink(
+              colors,
+              Icons.people_alt_outlined,
+              'Roles',
+              () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const AdminRolesScreen(),
+                ),
+              ),
+            ),
+            _quickLink(
+              colors,
+              Icons.meeting_room_outlined,
+              'Manage rooms',
+              () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const RoomsScreen(),
+                ),
+              ),
+            ),
+            _quickLink(
+              colors,
+              Icons.poll_outlined,
+              'Manage polls',
+              () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const PollsScreen(),
+                ),
+              ),
+            ),
+          ]
+        : [
+            _quickLink(
+              colors,
+              Icons.checklist_rounded,
+              'My duties',
+              () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const DutiesScreen(),
+                ),
+              ),
+            ),
+            _quickLink(
+              colors,
+              Icons.build_outlined,
+              'Equipment',
+              () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const EquipmentScreen(),
+                ),
+              ),
+            ),
+            _quickLink(
+              colors,
+              Icons.poll_outlined,
+              'Meal polls',
+              () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const PollsScreen(),
+                ),
+              ),
+            ),
+            _quickLink(
+              colors,
+              Icons.menu_book_outlined,
+              'House rules',
+              () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const HouseRulesScreen(),
+                ),
+              ),
+            ),
+          ],
+  ),
+
+  const SizedBox(height: 16),
+],
+
                     ),
                   ),
                 ],
@@ -764,43 +951,57 @@ class _HomeScreenState extends State<HomeScreen> {
             (value: _isAvailable ? 'Yes' : 'No', label: 'Available'),
           ];
 
-    return Row(
-      children: [
-        for (var i = 0; i < stats.length; i++) ...[
-          if (i > 0) const SizedBox(width: 10),
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    stats[i].value,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    stats[i].label,
-                    style: const TextStyle(
-                      color: Colors.white60,
-                      fontSize: 9.5,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
+    
+return Row(
+  children: [
+    for (var i = 0; i < stats.length; i++) ...[
+      if (i > 0) const SizedBox(width: 10),
+      Expanded(
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 8,
+            vertical: 16,
+          ),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.12),
             ),
           ),
-        ],
-      ],
-    );
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                stats[i].value,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 23,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                stats[i].label.toUpperCase(),
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.75),
+                  fontSize: 9,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.8,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ),
+    ],
+  ],
+);
+
   }
 
   Widget _buildAttentionBanner(ColorScheme colors) {
@@ -1204,89 +1405,218 @@ class _NewAnnouncementSheetState extends State<_NewAnnouncementSheet> {
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
       ),
-      child: Container(
-        decoration: BoxDecoration(
-          color: colors.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      
+child: Container(
+  decoration: BoxDecoration(
+    color: colors.surface,
+    borderRadius: const BorderRadius.vertical(
+      top: Radius.circular(30),
+    ),
+  ),
+  padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
+  child: SafeArea(
+    top: false,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Drag handle
+        Center(
+          child: Container(
+            width: 42,
+            height: 5,
+            margin: const EdgeInsets.only(bottom: 24),
+            decoration: BoxDecoration(
+              color: colors.outlineVariant,
+              borderRadius: BorderRadius.circular(99),
+            ),
+          ),
         ),
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+
+        // Header
+        Row(
           children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: colors.outlineVariant,
-                  borderRadius: BorderRadius.circular(999),
-                ),
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: _accent.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Icon(
+                Icons.campaign_rounded,
+                color: _accent,
+                size: 25,
               ),
             ),
-            Text(
-              'New announcement',
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-                color: colors.onSurface,
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _titleController,
-              decoration: _decoration(
-                colors,
-                hint: 'e.g. Water shut off Friday morning',
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _messageController,
-              maxLines: 4,
-              decoration: _decoration(
-                colors,
-                hint: 'Give residents the details…',
-              ),
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: 10),
-              Text(_error!, style: const TextStyle(color: _red, fontSize: 13)),
-            ],
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                onPressed: _submitting ? null : _submit,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: colors.onSurface,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(999),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'New announcement',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.5,
+                      color: colors.onSurface,
+                    ),
                   ),
-                ),
-                child: _submitting
-                    ? SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: colors.surface,
-                        ),
-                      )
-                    : Text(
-                        'Post announcement',
-                        style: TextStyle(
-                          color: colors.surface,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Share an update with residents.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
         ),
-      ),
+
+        const SizedBox(height: 26),
+
+        // Title field
+        Text(
+          'TITLE',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1,
+            color: colors.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _titleController,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: _decoration(
+            colors,
+            hint: 'e.g. Water shut off Friday morning',
+          ).copyWith(
+            filled: true,
+            fillColor: colors.surfaceContainerHighest
+                .withValues(alpha: 0.45),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 17,
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 20),
+
+        // Message field
+        Text(
+          'MESSAGE',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1,
+            color: colors.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _messageController,
+          maxLines: 4,
+          minLines: 4,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: _decoration(
+            colors,
+            hint: 'Give residents the details...',
+          ).copyWith(
+            filled: true,
+            fillColor: colors.surfaceContainerHighest
+                .withValues(alpha: 0.45),
+            alignLabelWithHint: true,
+            contentPadding: const EdgeInsets.all(16),
+          ),
+        ),
+
+        // Error message
+        if (_error != null) ...[
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: _red.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.error_outline_rounded,
+                  color: _red,
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _error!,
+                    style: const TextStyle(
+                      color: _red,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+
+        const SizedBox(height: 24),
+
+        // Submit button
+        SizedBox(
+          width: double.infinity,
+          height: 54,
+          child: ElevatedButton(
+            onPressed: _submitting ? null : _submit,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _accent,
+              disabledBackgroundColor:
+                  _accent.withValues(alpha: 0.5),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(17),
+              ),
+            ),
+            child: _submitting
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.send_rounded, size: 18),
+                      SizedBox(width: 10),
+                      Text(
+                        'Post announcement',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+        ),
+      ],
+    ),
+  ),
+),
+
     );
   }
 

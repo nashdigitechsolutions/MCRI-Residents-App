@@ -78,102 +78,133 @@ class _MainShellState extends State<MainShell> {
           children: _tabs.map((t) => t.screen).toList(),
         ),
       ),
-      bottomNavigationBar: Container(
-        height: 60,
-        decoration: BoxDecoration(
-          color: colors.surface,
-          border: Border(top: BorderSide(color: colors.outlineVariant)),
+      bottomNavigationBar: SafeArea(
+  minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+  child: Container(
+    height: 72,
+    padding: const EdgeInsets.all(6),
+    decoration: BoxDecoration(
+      color: colors.surface,
+      borderRadius: BorderRadius.circular(26),
+      border: Border.all(
+        color: colors.outlineVariant.withValues(alpha: 0.6),
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.08),
+          blurRadius: 20,
+          offset: const Offset(0, 6),
         ),
-        child: SafeArea(
-          top: false,
-          child: Row(
-            children: List.generate(_tabs.length, (i) {
-              final selected = i == _currentIndex;
-              final tab = _tabs[i];
-              final count = tab.badgeCount?.call(unread) ?? 0;
+      ],
+    ),
+    child: Row(
+      children: List.generate(_tabs.length, (i) {
+        final selected = i == _currentIndex;
+        final tab = _tabs[i];
+        final count = tab.badgeCount?.call(unread) ?? 0;
 
-              return Expanded(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => setState(() => _currentIndex = i),
-                  child: Center(
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          curve: Curves.easeOut,
-                          transform: Matrix4.translationValues(
-                            0,
-                            selected ? -14 : 0,
-                            0,
-                          ),
-                          padding: EdgeInsets.all(selected ? 12 : 8),
-                          decoration: BoxDecoration(
-                            color: selected ? _accent : Colors.transparent,
-                            shape: BoxShape.circle,
-                            boxShadow: selected
-                                ? [
-                                    BoxShadow(
-                                      color: _accent.withValues(alpha: 0.35),
-                                      blurRadius: 12,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ]
-                                : null,
-                          ),
-                          child: Icon(
-                            tab.icon,
-                            size: 22,
-                            color: selected
-                                ? Colors.white
-                                : colors.onSurfaceVariant,
-                          ),
+        return Expanded(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => setState(() => _currentIndex = i),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeInOut,
+              margin: const EdgeInsets.symmetric(horizontal: 2),
+              decoration: BoxDecoration(
+                color: selected
+                    ? _accent.withValues(alpha: 0.12)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      AnimatedScale(
+                        scale: selected ? 1.12 : 1.0,
+                        duration: const Duration(milliseconds: 200),
+                        child: Icon(
+                          tab.icon,
+                          size: 22,
+                          color: selected
+                              ? _accent
+                              : colors.onSurfaceVariant,
                         ),
-                        if (count > 0)
-                          Positioned(
-                            // When selected, the icon is translated up -14,
-                            // so the badge needs to ride along with it rather
-                            // than staying pinned to the unselected position.
-                            top: selected ? -14 : -2,
-                            right: selected ? 2 : -2,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 5,
-                                vertical: 1,
+                      ),
+                      if (count > 0)
+                        Positioned(
+                          top: -6,
+                          right: -9,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 2,
+                            ),
+                            constraints: const BoxConstraints(
+                              minWidth: 16,
+                              minHeight: 16,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _badgeRed,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: colors.surface,
+                                width: 1.5,
                               ),
-                              constraints: const BoxConstraints(
-                                minWidth: 16,
-                                minHeight: 16,
-                              ),
-                              decoration: BoxDecoration(
-                                color: _badgeRed,
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: colors.surface,
-                                  width: 1.5,
-                                ),
-                              ),
-                              alignment: Alignment.center,
-                              child: Text(
-                                count > 9 ? '9+' : '$count',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w700,
-                                ),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              count > 9 ? '9+' : '$count',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
                           ),
-                      ],
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  AnimatedDefaultTextStyle(
+                    duration: const Duration(milliseconds: 200),
+                    style: TextStyle(
+                      fontSize: selected ? 10 : 9,
+                      fontWeight: selected
+                          ? FontWeight.w700
+                          : FontWeight.w500,
+                      color: selected
+                          ? _accent
+                          : colors.onSurfaceVariant,
+                    ),
+                    child: Text(
+                      tab.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                ),
-              );
-            }),
+                  const SizedBox(height: 3),
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    height: 3,
+                    width: selected ? 14 : 0,
+                    decoration: BoxDecoration(
+                      color: _accent,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      }),
+    ),
+  ),
+),
     );
   }
 }
