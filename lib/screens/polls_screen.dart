@@ -10,6 +10,7 @@ import '../models/poll_detail.dart';
 import '../models/poll_vote_row.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
+import '../utils/live_refresh.dart';
 import '../utils/poll_export.dart';
 import '../utils/whatsapp_share.dart';
 
@@ -23,7 +24,7 @@ class PollsScreen extends StatefulWidget {
   State<PollsScreen> createState() => _PollsScreenState();
 }
 
-class _PollsScreenState extends State<PollsScreen> {
+class _PollsScreenState extends State<PollsScreen> with LiveRefresh {
   List<PollDetail> _polls = [];
   bool _loading = true;
 
@@ -31,6 +32,8 @@ class _PollsScreenState extends State<PollsScreen> {
   void initState() {
     super.initState();
     _fetchPolls();
+    // Votes, new polls, closures and deletions from anyone show up live.
+    listenLive(['poll_updated'], () => _fetchPolls(showLoading: false));
   }
 
   Future<void> _fetchPolls({bool showLoading = true}) async {
@@ -43,6 +46,7 @@ class _PollsScreenState extends State<PollsScreen> {
       final details = await Future.wait(
         ids.map((id) => ApiService.get('/polls/$id')),
       );
+      if (!mounted) return;
       setState(() {
         _polls = details
             .map((d) => PollDetail.fromJson(d as Map<String, dynamic>))
@@ -50,8 +54,10 @@ class _PollsScreenState extends State<PollsScreen> {
         _loading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() => _loading = false);
-      if (mounted) _notify('Could not load polls', isError: true);
+      // Background refreshes fail silently; the next event retries.
+      if (showLoading) _notify('Could not load polls', isError: true);
     }
   }
 
@@ -141,6 +147,7 @@ class _PollsScreenState extends State<PollsScreen> {
     return _polls
         .map(
           (poll) => _ManagePollCard(
+            key: ValueKey('manage-${poll.pollId}'),
             poll: poll,
             onChanged: () => _fetchPolls(showLoading: false),
             notify: _notify,
@@ -168,6 +175,7 @@ class _PollsScreenState extends State<PollsScreen> {
       for (final poll in open) {
         widgets.add(
           _VoteCard(
+            key: ValueKey('vote-${poll.pollId}'),
             poll: poll,
             onVoted: () => _fetchPolls(showLoading: false),
             notify: _notify,
@@ -193,6 +201,7 @@ class _PollsScreenState extends State<PollsScreen> {
           children: [
             for (final poll in past) ...[
               _VoteCard(
+                key: ValueKey('past-${poll.pollId}'),
                 poll: poll,
                 onVoted: () => _fetchPolls(showLoading: false),
                 notify: _notify,
@@ -300,6 +309,7 @@ class _VoteCard extends StatefulWidget {
   final void Function(String, {bool isError}) notify;
 
   const _VoteCard({
+    super.key,
     required this.poll,
     required this.onVoted,
     required this.notify,
@@ -317,6 +327,18 @@ class _VoteCardState extends State<_VoteCard> {
   void initState() {
     super.initState();
     _draft = List.of(widget.poll.myOptionIds);
+  }
+
+  @override
+  void didUpdateWidget(covariant _VoteCard old) {
+    super.didUpdateWidget(old);
+    // A live refresh brought new server state. If the resident hasn't
+    // started changing their selection, follow the server (e.g. a vote cast
+    // from another device); otherwise keep their unsaved draft.
+    final untouched =
+        (List.of(_draft)..sort()).toString() ==
+        (List.of(old.poll.myOptionIds)..sort()).toString();
+    if (untouched) _draft = List.of(widget.poll.myOptionIds);
   }
 
   bool get _hasChanges {
@@ -521,6 +543,7 @@ class _ManagePollCard extends StatefulWidget {
   final void Function(String, {bool isError}) notify;
 
   const _ManagePollCard({
+    super.key,
     required this.poll,
     required this.onChanged,
     required this.notify,

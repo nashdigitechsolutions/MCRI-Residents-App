@@ -15,6 +15,7 @@ import 'services/device_registration_service.dart';
 import 'services/notification_router.dart';
 import 'services/onesignal_service.dart';
 import 'theme/app_theme.dart';
+import 'widgets/animated_splash.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -207,49 +208,42 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   }
 }
 
-class _AuthGate extends StatelessWidget {
+class _AuthGate extends StatefulWidget {
   const _AuthGate();
+
+  @override
+  State<_AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<_AuthGate> {
+  // The launch animation plays once per cold start, and stays up until both
+  // it has finished and the stored session has been checked.
+  bool _splashDone = false;
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
+    final showSplash = !_splashDone || auth.loading;
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 280),
-      child: auth.loading
-          ? const _Splash(key: ValueKey('splash'))
+      duration: const Duration(milliseconds: 420),
+      switchInCurve: Curves.easeOutCubic,
+      transitionBuilder: (child, anim) => FadeTransition(
+        opacity: anim,
+        child: ScaleTransition(
+          scale: Tween(begin: 0.98, end: 1.0).animate(anim),
+          child: child,
+        ),
+      ),
+      child: showSplash
+          ? AnimatedSplash(
+              key: const ValueKey('splash'),
+              onFinished: () {
+                if (mounted) setState(() => _splashDone = true);
+              },
+            )
           : auth.isLoggedIn
           ? const MainShell(key: ValueKey('shell'))
           : const LoginScreen(key: ValueKey('login')),
-    );
-  }
-}
-
-class _Splash extends StatelessWidget {
-  const _Splash({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Image.asset(
-              'lib/assets/logo.png',
-              width: 72,
-              height: 72,
-              cacheWidth: 216,
-            ),
-            const SizedBox(height: 24),
-            const SizedBox(
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(strokeWidth: 2.2),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

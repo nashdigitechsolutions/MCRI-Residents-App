@@ -14,6 +14,8 @@ import 'conversation_detail_screen.dart';
 const _accent = AppColors.primary;
 const _red = AppColors.danger;
 
+const _quietRefreshEvents = ['message_edited', 'message_deleted'];
+
 class ConversationsScreen extends StatefulWidget {
   const ConversationsScreen({super.key});
 
@@ -80,13 +82,22 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
     _onReaction = (_) => _fetch(showLoading: false);
     ws.on('message', _onMessage!);
     ws.on('reaction', _onReaction!);
+    // Edited or deleted messages change the preview line.
+    for (final t in _quietRefreshEvents) {
+      ws.on(t, _onReaction!);
+    }
   }
 
   @override
   void dispose() {
     final ws = _ws;
     if (_onMessage != null) ws.off('message', _onMessage!);
-    if (_onReaction != null) ws.off('reaction', _onReaction!);
+    if (_onReaction != null) {
+      ws.off('reaction', _onReaction!);
+      for (final t in _quietRefreshEvents) {
+        ws.off(t, _onReaction!);
+      }
+    }
     super.dispose();
   }
 

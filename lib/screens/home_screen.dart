@@ -14,6 +14,7 @@ import '../providers/auth_provider.dart';
 import '../providers/settings_provider.dart';
 import '../services/api_service.dart';
 import '../services/storage_service.dart';
+import '../utils/live_refresh.dart';
 import '../utils/initials.dart';
 import 'duties_screen.dart';
 import 'events_screen.dart';
@@ -46,7 +47,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with LiveRefresh {
   List<Announcement> _announcements = [];
   List<Event> _events = [];
   List<Duty> _myDuties = [];
@@ -65,6 +66,14 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadAvailabilityCache();
     _loadDashboard();
     _loadUsername();
+    // Admin stats (pending equipment requests) stay current live.
+    if (_isAdmin) {
+      listenLive(
+        ['equipment_updated'],
+        () => _loadDashboard(showLoading: false),
+        debounce: const Duration(seconds: 1),
+      );
+    }
   }
 
   String _cacheKey(int? userId) => 'mcri_profile_cache_${userId ?? 'anon'}';
@@ -104,10 +113,10 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _loadDashboard() async {
+  Future<void> _loadDashboard({bool showLoading = true}) async {
     final isAdmin = _isAdmin;
     final myId = context.read<AuthProvider>().user?.userId;
-    setState(() => _loading = true);
+    if (showLoading) setState(() => _loading = true);
     try {
       final futures = <Future<dynamic>>[
         ApiService.get('/announcements').catchError((_) => []),

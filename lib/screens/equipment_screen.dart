@@ -8,6 +8,7 @@ import '../models/equipment_report.dart';
 import '../models/equipment_request.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
+import '../utils/live_refresh.dart';
 
 const _red = AppColors.danger;
 const _accent = AppColors.primary;
@@ -46,7 +47,7 @@ class EquipmentScreen extends StatefulWidget {
   State<EquipmentScreen> createState() => _EquipmentScreenState();
 }
 
-class _EquipmentScreenState extends State<EquipmentScreen> {
+class _EquipmentScreenState extends State<EquipmentScreen> with LiveRefresh {
   _Tab _tab = _Tab.browse;
   List<Equipment> _items = [];
   List<EquipmentRequest> _myRequests = [];
@@ -70,10 +71,13 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
     super.initState();
     _loadAll();
     _loadCaretaker();
+    // Request approvals, returns, fault reports and stock changes made by
+    // anyone (admin, caretaker, other residents) appear live.
+    listenLive(['equipment_updated'], () => _loadAll(showLoading: false));
   }
 
-  Future<void> _loadAll() async {
-    setState(() => _loading = true);
+  Future<void> _loadAll({bool showLoading = true}) async {
+    if (showLoading) setState(() => _loading = true);
     try {
       final futures = <Future<dynamic>>[
         ApiService.get('/equipment'),
@@ -81,6 +85,7 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
         _isStaff ? ApiService.get('/equipment-reports') : Future.value([]),
       ];
       final results = await Future.wait(futures);
+      if (!mounted) return;
       setState(() {
         _items = (results[0] as List)
             .map((j) => Equipment.fromJson(j as Map<String, dynamic>))
@@ -94,8 +99,9 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
         _loading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() => _loading = false);
-      if (mounted) _notify('Could not load equipment data', isError: true);
+      if (showLoading) _notify('Could not load equipment data', isError: true);
     }
   }
 
