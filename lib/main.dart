@@ -50,6 +50,16 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   static final _lightTheme = AppTheme.light();
   static final _darkTheme = AppTheme.dark();
 
+  /// "Compact lists": tighter density everywhere (list tiles, buttons, chips).
+  static final _compactCache = <ThemeData, ThemeData>{};
+  static ThemeData _compact(ThemeData t) => _compactCache.putIfAbsent(
+    t,
+    () => t.copyWith(
+      visualDensity: VisualDensity.compact,
+      listTileTheme: t.listTileTheme.copyWith(dense: true),
+    ),
+  );
+
   bool _wasLoggedIn = false;
   bool _wasSocketConnected = false;
 
@@ -71,6 +81,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         return true; // already visible; swallow silently
       }
       if (!_authProvider.isLoggedIn) return false;
+      // "In-app pop-ups" off: the Notifications badge still updates live.
+      if (!_settingsProvider.prefs.inAppBanners) return true;
       InAppBanner.show(
         title: title,
         body: body,
@@ -92,6 +104,11 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     _webSocketProvider.on(
       'notification',
       (_) => _unreadProvider.onNotificationEvent(),
+    );
+    // I read a chat on another device (website, second phone): clear it here.
+    _webSocketProvider.on(
+      'read',
+      (p) => _unreadProvider.onReadEvent(p, _authProvider.user?.userId),
     );
 
     // Catch up on anything missed whenever the socket (re)connects.
@@ -117,16 +134,23 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     _wasLoggedIn = loggedIn;
 
     if (loggedIn) {
-      if (!_settingsProvider.loaded) _settingsProvider.fetch();
+      final settingsReady = _settingsProvider.loaded
+          ? Future<void>.value()
+          : _settingsProvider.fetch();
       if (_authProvider.token != null) {
         _webSocketProvider.connect(_authProvider.token!);
         _unreadProvider.refresh();
       }
-      OneSignalService.requestPermission().then((granted) {
-        final pushWanted =
-            !_settingsProvider.loaded ||
-            _settingsProvider.prefs.notificationsEnabled;
-        if (granted && pushWanted && _authProvider.isLoggedIn) {
+      // Only (re)register for pushes once the user's settings are known, so
+      // "Push notifications: off" survives an app restart.
+      settingsReady.then((_) async {
+        if (!_authProvider.isLoggedIn) return;
+        if (!_settingsProvider.prefs.notificationsEnabled) {
+          DeviceRegistrationService.unregister();
+          return;
+        }
+        final granted = await OneSignalService.requestPermission();
+        if (granted && _authProvider.isLoggedIn) {
           DeviceRegistrationService.registerWhenReady();
         }
       });
@@ -191,9 +215,12 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         ChangeNotifierProvider.value(value: _unreadProvider),
       ],
       // Only the theme setting rebuilds MaterialApp, not every settings change.
-      child: Selector<SettingsProvider, String>(
-        selector: (_, s) => s.prefs.theme,
-        builder: (context, theme, _) {
+      // Rebuild MaterialApp only for settings that change how it looks.
+      child: Selector<SettingsProvider, (String, double, bool)>(
+        selector: (_, s) =>
+            (s.prefs.theme, s.prefs.textScale, s.prefs.compactLists),
+        builder: (context, look, _) {
+          final (theme, textScale, compact) = look;
           return MaterialApp(
             navigatorKey: navigatorKey,
             scaffoldMessengerKey: scaffoldMessengerKey,
@@ -204,18 +231,18 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
               'system' => ThemeMode.system,
               _ => ThemeMode.light,
             },
-            theme: _lightTheme,
-            darkTheme: _darkTheme,
+            theme: compact ? _compact(_lightTheme) : _lightTheme,
+            darkTheme: compact ? _compact(_darkTheme) : _darkTheme,
             // Respect the accessibility font size, but cap it so fixed-height
             // rows and cards can never overflow or overlap.
             builder: (context, child) {
               final mq = MediaQuery.of(context);
               return MediaQuery(
                 data: mq.copyWith(
-                  textScaler: mq.textScaler.clamp(
-                    minScaleFactor: 0.9,
-                    maxScaleFactor: 1.25,
-                  ),
+                  // System size × the in-app "Text size" setting, capped.
+                  textScaler: TextScaler.linear(
+                    mq.textScaler.scale(1) * textScale,
+                  ).clamp(minScaleFactor: 0.85, maxScaleFactor: 1.25),
                 ),
                 child: child!,
               );

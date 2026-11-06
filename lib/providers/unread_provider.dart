@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../services/api_service.dart';
@@ -10,6 +12,12 @@ class UnreadProvider extends ChangeNotifier {
   int? _activeConversationId;
 
   bool _chatBadgeEnabled = true;
+
+  // Fires a conversation id whenever it becomes read (opened here, read on
+  // another device, or a message arrives while it's open) so lists can
+  // update their own unread dots without refetching.
+  final _readEvents = StreamController<int>.broadcast();
+  Stream<int> get conversationReads => _readEvents.stream;
 
   int get unreadNotifications => _unreadNotifications;
   int get unreadConversations => _chatBadgeEnabled ? _unreadConversations : 0;
@@ -25,6 +33,49 @@ class UnreadProvider extends ChangeNotifier {
   /// arriving for it are treated as already read, like WhatsApp.
   void setActiveConversation(int? conversationId) {
     _activeConversationId = conversationId;
+  }
+
+  /// A chat screen opened (from the list, a notification, anywhere): it's
+  /// active, read locally right away, and the server is told.
+  void openConversation(int conversationId) {
+    _activeConversationId = conversationId;
+    markConversationRead(conversationId, syncServer: true);
+  }
+
+  /// A chat screen closed: one last read sync (covers messages that landed
+  /// while it was open), then it's no longer active.
+  void closeConversation(int conversationId) {
+    if (_activeConversationId == conversationId) _activeConversationId = null;
+    // Deferred: this runs from a widget's dispose(), where notifying
+    // listeners synchronously would rebuild a locked tree.
+    Future.microtask(
+      () => markConversationRead(conversationId, syncServer: true),
+    );
+  }
+
+  /// "Read at" that is never earlier than the conversation's last activity,
+  /// so a phone clock running behind the server can't leave it unread.
+  DateTime _readStamp(int convId) {
+    final now = DateTime.now();
+    final c = _conversationsCache.where(
+      (c) => _asInt(c['conversation_id']) == convId,
+    );
+    if (c.isEmpty) return now;
+    final last = DateTime.tryParse(
+      '${c.first['last_activity_at'] ?? c.first['last_message_at'] ?? ''}',
+    );
+    if (last == null || !last.isAfter(now)) return now;
+    return last.add(const Duration(milliseconds: 1));
+  }
+
+  /// Socket 'read' event. When it's ME reading on another device (website,
+  /// second phone), this device's badge clears too.
+  void onReadEvent(dynamic payload, int? myUserId) {
+    final d = payload is Map ? (payload['read'] ?? payload) : null;
+    if (d is! Map || myUserId == null) return;
+    if (_asInt(d['user_id']) != myUserId) return;
+    final convId = _asInt(d['conversation_id']);
+    if (convId != null) markConversationRead(convId);
   }
 
   /// Full sync from the server. Used on login, socket (re)connect and app
@@ -45,6 +96,10 @@ class UnreadProvider extends ChangeNotifier {
       _conversationsCache = (results[1] as List)
           .map((c) => Map<String, dynamic>.from(c as Map))
           .toList();
+      // A chat opened before this sync landed (e.g. straight from a push on
+      // cold start) is read: re-stamp it against the server's timestamps.
+      final active = _activeConversationId;
+      if (active != null) _optimisticReads[active] = _readStamp(active);
       _unreadConversations = _computeUnread(_conversationsCache);
 
       notifyListeners();
@@ -97,11 +152,12 @@ class UnreadProvider extends ChangeNotifier {
     if (_activeConversationId == convId) {
       // I'm looking at this chat right now: count it as read, and tell the
       // server so a later refresh() doesn't resurrect it as unread.
-      _optimisticReads[convId] = DateTime.now();
+      _optimisticReads[convId] = _readStamp(convId);
       ApiService.post(
         '/conversations/$convId/read',
         {},
       ).catchError((_) => null);
+      _readEvents.add(convId);
     }
 
     _unreadConversations = _computeUnread(_conversationsCache);
@@ -142,15 +198,28 @@ class UnreadProvider extends ChangeNotifier {
     return count;
   }
 
-  void markConversationRead(int conversationId) {
-    _optimisticReads[conversationId] = DateTime.now();
+  void markConversationRead(int conversationId, {bool syncServer = false}) {
+    _optimisticReads[conversationId] = _readStamp(conversationId);
     _unreadConversations = _computeUnread(_conversationsCache);
+    _readEvents.add(conversationId);
     notifyListeners();
+    if (syncServer) {
+      ApiService.post(
+        '/conversations/$conversationId/read',
+        {},
+      ).catchError((_) => null);
+    }
   }
 
   void markNotificationsRead() {
     _unreadNotifications = 0;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _readEvents.close();
+    super.dispose();
   }
 
   void reset() {

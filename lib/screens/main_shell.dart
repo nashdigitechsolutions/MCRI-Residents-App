@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/unread_provider.dart';
@@ -7,6 +6,7 @@ import '../providers/websocket_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/ui.dart';
+import '../utils/haptics.dart';
 import '../navigation/app_navigator.dart';
 import '../services/notification_router.dart';
 import 'conversation_screen.dart';
@@ -104,7 +104,7 @@ class _MainShellState extends State<MainShell> {
 
   void _select(int i) {
     if (i == _currentIndex) return;
-    HapticFeedback.selectionClick();
+    AppHaptics.selection();
     shellTab.value = i;
   }
 

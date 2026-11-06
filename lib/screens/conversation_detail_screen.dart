@@ -1,5 +1,6 @@
 import 'package:mcri_residents_app/widgets/app_loader.dart';
 import 'package:mcri_residents_app/theme/app_theme.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:intl/intl.dart';
@@ -14,6 +15,7 @@ import '../providers/auth_provider.dart';
 import '../providers/unread_provider.dart';
 import '../providers/websocket_provider.dart';
 import '../services/api_service.dart';
+import '../utils/linkify.dart';
 import '../widgets/emoji_picker.dart';
 
 const _accent = AppColors.primary;
@@ -47,7 +49,8 @@ class ConversationDetailScreen extends StatefulWidget {
   }
 }
 
-class _ConversationDetailScreenState extends State<ConversationDetailScreen> {
+class _ConversationDetailScreenState extends State<ConversationDetailScreen>
+    with WidgetsBindingObserver {
   List<ChatMessage> _messages = [];
   List<ConversationMember> _members = [];
   Map<String, dynamic>? _meta;
@@ -104,14 +107,16 @@ class _ConversationDetailScreenState extends State<ConversationDetailScreen> {
     };
     _load();
     _unread = context.read<UnreadProvider>();
-    _unread.setActiveConversation(widget.conversationId);
-    _unread.markConversationRead(widget.conversationId);
-    ApiService.post(
-      '/conversations/${widget.conversationId}/read',
-      {},
-    ).catchError((_) => null);
+    // However this chat was opened (list, push, banner): it's now read,
+    // the badge drops immediately and the server + other devices are told.
+    _unread.openConversation(widget.conversationId);
 
     _ws = context.read<WebSocketProvider>();
+    // Catch up on anything sent while the socket was down (cold start from a
+    // notification, network drop) or the app was in the background.
+    _wasSocketConnected = _ws.isConnected;
+    _ws.addListener(_onSocketState);
+    WidgetsBinding.instance.addObserver(this);
     final myId = context.read<AuthProvider>().user?.userId;
 
     _onMessage = (payload) {
@@ -258,12 +263,33 @@ class _ConversationDetailScreenState extends State<ConversationDetailScreen> {
     _ws.off('reaction', _onReaction);
     _ws.off('read', _onRead);
     _ws.off('typing', _onTyping);
-    _unread.setActiveConversation(null);
+    _ws.removeListener(_onSocketState);
+    WidgetsBinding.instance.removeObserver(this);
+    _unread.closeConversation(widget.conversationId);
     _textController.dispose();
     _scrollController.dispose();
     _searchController.dispose();
     _searchFocus.dispose();
     super.dispose();
+  }
+
+  bool _wasSocketConnected = false;
+
+  void _onSocketState() {
+    final connected = _ws.isConnected;
+    if (connected && !_wasSocketConnected && mounted) {
+      _load();
+      _unread.markConversationRead(widget.conversationId, syncServer: true);
+    }
+    _wasSocketConnected = connected;
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      _load();
+      _unread.openConversation(widget.conversationId);
+    }
   }
 
   Future<dynamic> _try(Future<dynamic> Function() request) async {
@@ -1458,6 +1484,64 @@ class _MessageBubbleState extends State<_MessageBubble> {
   double _dragOffset = 0;
   static const _swipeThreshold = 60.0;
 
+  // Tap handlers for links in this bubble; recreated each build, disposed.
+  final List<TapGestureRecognizer> _linkTaps = [];
+
+  void _clearLinkTaps() {
+    for (final t in _linkTaps) {
+      t.dispose();
+    }
+    _linkTaps.clear();
+  }
+
+  @override
+  void dispose() {
+    _clearLinkTaps();
+    super.dispose();
+  }
+
+  Future<void> _openLink(Uri uri) async {
+    final ok = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    ).catchError((_) => false);
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Couldn't open ${uri.toString()}")),
+      );
+    }
+  }
+
+  /// Message text with tappable links (web, email, phone) and, while
+  /// searching, highlighted matches.
+  List<InlineSpan> _messageSpans(String text) {
+    _clearLinkTaps();
+    final spans = <InlineSpan>[];
+    for (final seg in linkify(text)) {
+      if (!seg.isLink) {
+        spans.addAll(_highlighted(seg.text, widget.highlight, widget.mine));
+        continue;
+      }
+      final tap = TapGestureRecognizer()..onTap = () => _openLink(seg.uri!);
+      _linkTaps.add(tap);
+      spans.add(
+        TextSpan(
+          text: seg.text,
+          recognizer: tap,
+          style: TextStyle(
+            color: widget.mine ? Colors.white : AppColors.primaryDark,
+            fontWeight: FontWeight.w600,
+            decoration: TextDecoration.underline,
+            decorationColor: widget.mine
+                ? Colors.white70
+                : AppColors.primaryDark,
+          ),
+        ),
+      );
+    }
+    return spans;
+  }
+
   Map<String, List<String>> _groupedReactions() {
     final map = <String, List<String>>{};
     for (final r in widget.message.reactions) {
@@ -1614,11 +1698,7 @@ class _MessageBubbleState extends State<_MessageBubble> {
                                     : colors.onSurface,
                               ),
                               children: [
-                                ..._highlighted(
-                                  msg.message ?? '',
-                                  widget.highlight,
-                                  widget.mine,
-                                ),
+                                ..._messageSpans(msg.message ?? ''),
                                 if (msg.editedAt != null)
                                   TextSpan(
                                     text: '  (edited)',

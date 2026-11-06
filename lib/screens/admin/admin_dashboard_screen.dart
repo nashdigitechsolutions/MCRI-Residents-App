@@ -86,7 +86,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final id = req['request_id'] is String
         ? int.parse(req['request_id'])
         : req['request_id'] as int;
-    setState(() => _busyId = 'm-$id');
+    setState(() => _busyId = 'm-$id:$status');
     try {
       await ApiService.patch('/maintenance-requests/$id', {'status': status});
       _notify('Request updated');
@@ -94,7 +94,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     } catch (e) {
       _notify('Update failed', isError: true);
     } finally {
-      setState(() => _busyId = null);
+      if (mounted) setState(() => _busyId = null);
     }
   }
 
@@ -105,7 +105,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final id = req['equip_request_id'] is String
         ? int.parse(req['equip_request_id'])
         : req['equip_request_id'] as int;
-    setState(() => _busyId = 'er-$id');
+    setState(() => _busyId = 'er-$id:$status');
     try {
       await ApiService.patch('/equipment-requests/$id', {'status': status});
       _notify('Request updated');
@@ -113,7 +113,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     } catch (e) {
       _notify('Update failed', isError: true);
     } finally {
-      setState(() => _busyId = null);
+      if (mounted) setState(() => _busyId = null);
     }
   }
 
@@ -124,7 +124,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final id = rep['eq_reports_id'] is String
         ? int.parse(rep['eq_reports_id'])
         : rep['eq_reports_id'] as int;
-    setState(() => _busyId = 'rep-$id');
+    setState(() => _busyId = 'rep-$id:$status');
     try {
       await ApiService.patch('/equipment-reports/$id', {'status': status});
       _notify('Report updated');
@@ -132,7 +132,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     } catch (e) {
       _notify('Update failed', isError: true);
     } finally {
-      setState(() => _busyId = null);
+      if (mounted) setState(() => _busyId = null);
     }
   }
 
@@ -225,7 +225,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     empty: _pendingMaintenance.isEmpty,
                     emptyLabel: 'No open requests — all caught up.',
                     rows: _pendingMaintenance.map((req) {
-                      final busy = _busyId == 'm-${req['request_id']}';
+                      final rowKey = 'm-${req['request_id']}';
+                      final busy = _busyId?.startsWith('$rowKey:') ?? false;
                       return _ActionRow(
                         title: req['title'] as String? ?? '',
                         subtitle:
@@ -234,12 +235,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           _smallOutlined(
                             'Start',
                             busy: busy,
+                            spinning: _busyId == '$rowKey:in_progress',
                             onTap: () => _updateMaintenance(req, 'in_progress'),
                           ),
                           _smallDark(
                             colors,
                             'Resolve',
                             busy: busy,
+                            spinning: _busyId == '$rowKey:resolved',
                             onTap: () => _updateMaintenance(req, 'resolved'),
                           ),
                         ],
@@ -259,7 +262,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     empty: _pendingEquipRequests.isEmpty,
                     emptyLabel: 'No pending requests.',
                     rows: _pendingEquipRequests.map((req) {
-                      final busy = _busyId == 'er-${req['equip_request_id']}';
+                      final rowKey = 'er-${req['equip_request_id']}';
+                      final busy = _busyId?.startsWith('$rowKey:') ?? false;
                       return _ActionRow(
                         icon: Icons.build_outlined,
                         title:
@@ -269,12 +273,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           _smallOutlined(
                             'Reject',
                             busy: busy,
+                            spinning: _busyId == '$rowKey:rejected',
                             onTap: () => _updateEquipRequest(req, 'rejected'),
                           ),
                           _smallDark(
                             colors,
                             'Approve',
                             busy: busy,
+                            spinning: _busyId == '$rowKey:approved',
                             onTap: () => _updateEquipRequest(req, 'approved'),
                           ),
                         ],
@@ -290,7 +296,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     empty: _openEquipReports.isEmpty,
                     emptyLabel: 'No open reports.',
                     rows: _openEquipReports.map((rep) {
-                      final busy = _busyId == 'rep-${rep['eq_reports_id']}';
+                      final rowKey = 'rep-${rep['eq_reports_id']}';
+                      final busy = _busyId?.startsWith('$rowKey:') ?? false;
                       final isOpen = rep['status'] == 'open';
                       return _ActionRow(
                         icon: Icons.warning_amber_rounded,
@@ -301,6 +308,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               ? _smallOutlined(
                                   'Start',
                                   busy: busy,
+                                  spinning: _busyId == '$rowKey:in_progress',
                                   onTap: () =>
                                       _updateEquipReport(rep, 'in_progress'),
                                 )
@@ -308,6 +316,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   colors,
                                   'Resolve',
                                   busy: busy,
+                                  spinning: _busyId == '$rowKey:resolved',
                                   onTap: () =>
                                       _updateEquipReport(rep, 'resolved'),
                                 ),
@@ -480,6 +489,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Widget _smallOutlined(
     String label, {
     required bool busy,
+    bool spinning = false,
     required VoidCallback onTap,
   }) {
     final colors = Theme.of(context).colorScheme;
@@ -494,7 +504,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             borderRadius: BorderRadius.circular(999),
           ),
         ),
-        child: busy
+        child: spinning
             ? SizedBox(
                 width: 12,
                 height: 12,
@@ -515,6 +525,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     ColorScheme colors,
     String label, {
     required bool busy,
+    bool spinning = false,
     required VoidCallback onTap,
   }) {
     return SizedBox(
@@ -528,7 +539,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             borderRadius: BorderRadius.circular(999),
           ),
         ),
-        child: busy
+        child: spinning
             ? SizedBox(
                 width: 12,
                 height: 12,

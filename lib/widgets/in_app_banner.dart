@@ -1,11 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../navigation/app_navigator.dart';
 import '../services/notification_router.dart';
 import '../theme/app_theme.dart';
+import '../utils/haptics.dart';
 
 /// WhatsApp-style drop-down notification shown while the app is open.
 ///
@@ -26,7 +26,7 @@ class InAppBanner {
   }) {
     final overlay = navigatorKey.currentState?.overlay;
     if (overlay == null) return;
-    HapticFeedback.lightImpact();
+    AppHaptics.light();
     _remove();
     _entry = OverlayEntry(
       builder: (_) => _Banner(

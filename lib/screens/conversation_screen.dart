@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:mcri_residents_app/widgets/app_loader.dart';
 import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
@@ -35,6 +37,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
   void Function(dynamic)? _onReaction;
 
   late final WebSocketProvider _ws;
+  StreamSubscription<int>? _readSub;
 
   @override
   void initState() {
@@ -83,6 +86,11 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
     _onReaction = (_) => _fetch(showLoading: false);
     ws.on('message', _onMessage!);
     ws.on('reaction', _onReaction!);
+    // A chat became read anywhere (opened from a notification, read on the
+    // website…): drop its unread dot here too.
+    _readSub = context.read<UnreadProvider>().conversationReads.listen(
+      _markReadLocally,
+    );
     // Edited or deleted messages change the preview line.
     for (final t in _quietRefreshEvents) {
       ws.on(t, _onReaction!);
@@ -91,6 +99,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
 
   @override
   void dispose() {
+    _readSub?.cancel();
     final ws = _ws;
     if (_onMessage != null) ws.off('message', _onMessage!);
     if (_onReaction != null) {

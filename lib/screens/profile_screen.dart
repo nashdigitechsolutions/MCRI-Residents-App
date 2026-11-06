@@ -111,7 +111,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _ChangePasswordSheet(email: email),
+      builder: (_) => ChangePasswordSheet(email: email),
     );
     if (ok == true) _notify('Password updated');
   }
@@ -920,16 +920,16 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
 }
 
 /// --- Change password sheet ---
-class _ChangePasswordSheet extends StatefulWidget {
+class ChangePasswordSheet extends StatefulWidget {
   final String? email;
 
-  const _ChangePasswordSheet({this.email});
+  const ChangePasswordSheet({super.key, this.email});
 
   @override
-  State<_ChangePasswordSheet> createState() => _ChangePasswordSheetState();
+  State<ChangePasswordSheet> createState() => _ChangePasswordSheetState();
 }
 
-class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
+class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
   final _oldController = TextEditingController();
   final _newController = TextEditingController();
   late final TextEditingController _emailController;

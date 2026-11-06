@@ -84,6 +84,8 @@ class _EquipmentScreenState extends State<EquipmentScreen> with LiveRefresh {
   int? _requestingId;
   int? _busyReqId;
   int? _busyReportId;
+  // Which action is running on the busy card, so only that button spins.
+  String? _busyAction;
   int? _sharingReportId;
 
   bool get _isAdmin =>
@@ -279,7 +281,10 @@ class _EquipmentScreenState extends State<EquipmentScreen> with LiveRefresh {
       );
       if (note == null) return; // cancelled
     }
-    setState(() => _busyReqId = req.equipRequestId);
+    setState(() {
+      _busyReqId = req.equipRequestId;
+      _busyAction = status;
+    });
     try {
       await ApiService.patch('/equipment-requests/${req.equipRequestId}', {
         'status': status,
@@ -313,7 +318,10 @@ class _EquipmentScreenState extends State<EquipmentScreen> with LiveRefresh {
       );
       if (note == null) return;
     }
-    setState(() => _busyReportId = rep.eqReportsId);
+    setState(() {
+      _busyReportId = rep.eqReportsId;
+      _busyAction = status;
+    });
     try {
       await ApiService.patch('/equipment-reports/${rep.eqReportsId}', {
         'status': status,
@@ -823,6 +831,7 @@ class _EquipmentScreenState extends State<EquipmentScreen> with LiveRefresh {
                     'Approve & buy',
                     dark: true,
                     busy: busy,
+                    spinning: busy && _busyAction == 'approved',
                     onTap: () => _setRequestStatus(req, 'approved'),
                   ),
                 if (req.status == 'approved')
@@ -830,12 +839,14 @@ class _EquipmentScreenState extends State<EquipmentScreen> with LiveRefresh {
                     'Mark bought',
                     dark: true,
                     busy: busy,
+                    spinning: busy && _busyAction == 'purchased',
                     onTap: () => _setRequestStatus(req, 'purchased'),
                   ),
                 _smallButton(
                   'Decline',
                   dark: false,
                   busy: busy,
+                  spinning: busy && _busyAction == 'rejected',
                   onTap: () => _setRequestStatus(req, 'rejected'),
                 ),
               ],
@@ -1010,12 +1021,14 @@ class _EquipmentScreenState extends State<EquipmentScreen> with LiveRefresh {
                     'Start repair',
                     dark: false,
                     busy: busy,
+                    spinning: busy && _busyAction == 'in_progress',
                     onTap: () => _setReportStatus(rep, 'in_progress'),
                   ),
                 _smallButton(
                   'Mark fixed',
                   dark: true,
                   busy: busy,
+                  spinning: busy && _busyAction == 'resolved',
                   onTap: () => _setReportStatus(rep, 'resolved'),
                 ),
                 if (_isAdmin)
@@ -1128,8 +1141,11 @@ class _EquipmentScreenState extends State<EquipmentScreen> with LiveRefresh {
     String label, {
     required bool dark,
     required bool busy,
+    bool? spinning,
     required VoidCallback onTap,
   }) {
+    // busy disables the button; only the tapped one shows the loader.
+    final showSpinner = spinning ?? busy;
     final colors = Theme.of(context).colorScheme;
     return SizedBox(
       height: 32,
@@ -1145,7 +1161,7 @@ class _EquipmentScreenState extends State<EquipmentScreen> with LiveRefresh {
             borderRadius: BorderRadius.circular(999),
           ),
         ),
-        child: busy
+        child: showSpinner
             ? SizedBox(
                 width: 14,
                 height: 14,
