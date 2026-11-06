@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Resource shrinking (isShrinkResources) deletes resources that code
+     never references directly. OneSignal looks these up BY NAME at runtime
+     (android_small_icon: "ic_notification" / its default
+     "ic_stat_onesignal_default"), so without this they were stripped and
+     OneSignal fell back to its generic bell. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_notification,@drawable/ic_stat_onesignal_default,@drawable/ic_launcher_foreground,@drawable/ic_launcher_monochrome" />

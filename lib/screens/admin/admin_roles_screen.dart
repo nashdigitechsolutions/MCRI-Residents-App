@@ -1,3 +1,4 @@
+import 'package:mcri_residents_app/widgets/app_loader.dart';
 import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 
@@ -159,7 +160,7 @@ class _AdminRolesScreenState extends State<AdminRolesScreen> {
             : null,
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const AppLoadingView()
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
@@ -311,10 +312,7 @@ class _AdminRolesScreenState extends State<AdminRolesScreen> {
             SizedBox(
               width: 16,
               height: 16,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: colors.onSurfaceVariant,
-              ),
+              child: AppLoader(strokeWidth: 2, color: colors.onSurfaceVariant),
             )
           else
             DropdownButton<int>(
@@ -604,10 +602,7 @@ class _NewRoleSheetState extends State<_NewRoleSheet> {
                     ? SizedBox(
                         height: 20,
                         width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: colors.surface,
-                        ),
+                        child: AppLoader(strokeWidth: 2, color: colors.surface),
                       )
                     : Text(
                         'Create role',

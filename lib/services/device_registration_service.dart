@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:async';
 
 import 'package:onesignal_flutter/onesignal_flutter.dart';
@@ -32,7 +33,12 @@ class DeviceRegistrationService {
   static Future<void> _sendToBackend(String playerId) async {
     if (_lastSent == playerId) return;
     try {
-      await ApiService.post('/device-tokens', {'player_id': playerId});
+      await ApiService.post('/device-tokens', {
+        'player_id': playerId,
+        // This build creates the high-importance "mcri_alerts" channel
+        // (MainActivity.kt), so the API may target it for heads-up banners.
+        'alerts_channel': Platform.isAndroid,
+      });
       _lastSent = playerId;
     } catch (_) {
       // non-fatal — next app open will retry via registerWhenReady()

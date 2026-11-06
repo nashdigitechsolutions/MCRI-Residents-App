@@ -1,3 +1,4 @@
+import 'package:mcri_residents_app/widgets/app_loader.dart';
 import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -7,6 +8,7 @@ import '../models/notification.dart';
 import '../providers/unread_provider.dart';
 import '../providers/websocket_provider.dart';
 import '../services/api_service.dart';
+import '../services/notification_router.dart';
 
 const _accent = AppColors.primary;
 
@@ -47,8 +49,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         'message': raw['message'],
         'is_read': false,
         'created_at': raw['created_at'],
+        'route': payload['data']?['route'] ?? raw['data'],
       });
+      if (!mounted) return;
       setState(() => _items = [incoming, ..._items]);
+      // The socket row only carries notification_id; refetch quietly so taps
+      // and mark-read use the real per-user id.
+      _load();
     };
     _ws = context.read<WebSocketProvider>()
       ..on('notification', _onNotification);
@@ -66,13 +73,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       final list = (data as List)
           .map((j) => AppNotification.fromJson(j as Map<String, dynamic>))
           .toList();
+      if (!mounted) return;
       setState(() {
         _items = list;
         _loading = false;
       });
     } catch (e) {
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
     }
+  }
+
+  /// Mark read, then go wherever the notification points.
+  void _open(AppNotification n) {
+    _markRead(n);
+    final route = n.route ?? NotificationRouter.inferFromTitle(n.title);
+    if (route != null) NotificationRouter.open(route);
   }
 
   Future<void> _markRead(AppNotification n) async {
@@ -130,7 +145,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   ? SizedBox(
                       width: 14,
                       height: 14,
-                      child: CircularProgressIndicator(
+                      child: AppLoader(
                         strokeWidth: 2,
                         color: colors.onSurfaceVariant,
                       ),
@@ -143,7 +158,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const AppLoadingView()
           : _items.isEmpty
           ? Center(
               child: Column(
@@ -186,7 +201,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       color: Colors.transparent,
                       child: InkWell(
                         borderRadius: BorderRadius.circular(16),
-                        onTap: () => _markRead(n),
+                        onTap: () => _open(n),
                         child: Padding(
                           padding: const EdgeInsets.all(14),
                           child: Row(

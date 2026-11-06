@@ -22,7 +22,9 @@ class AppColors {
   static const text = Color(0xFF1F2937);
   static const muted = Color(0xFF6B7280);
   static const subtle = Color(0xFF9CA3AF);
-  static const border = Color(0xFFE5E7EB);
+  static const border = Color(
+    0xFFDCDFE4,
+  ); // visible hairline on white AND canvas
   static const divider = Color(0xFFF0F0F0);
   static const canvas = Color(0xFFF7F7F8); // page background
   static const surface = Colors.white;
@@ -32,7 +34,7 @@ class AppColors {
   static const darkCanvas = Color(0xFF0B0B0C);
   static const darkSurface = Color(0xFF161618);
   static const darkSurfaceHigh = Color(0xFF1F1F22);
-  static const darkBorder = Color(0xFF2C2C30);
+  static const darkBorder = Color(0xFF3A3A40);
 
   // Semantic
   static const danger = Color(0xFFEF4444);
@@ -110,7 +112,7 @@ class AppTheme {
       surfaceContainerHighest: dark
           ? const Color(0xFF26262A)
           : const Color(0xFFEBEBEB),
-      outline: dark ? const Color(0xFF3F3F46) : const Color(0xFFD1D5DB),
+      outline: dark ? const Color(0xFF5B5B63) : const Color(0xFF9CA3AF),
       outlineVariant: border,
       shadow: Colors.black,
       scrim: Colors.black,
@@ -238,7 +240,7 @@ class AppTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: onSurface,
-          side: BorderSide(color: border),
+          side: BorderSide(color: scheme.outline.withValues(alpha: 0.7)),
           padding: buttonPadding,
           minimumSize: const Size(64, 48),
           shape: buttonShape,
@@ -295,26 +297,53 @@ class AppTheme {
       progressIndicatorTheme: const ProgressIndicatorThemeData(
         color: AppColors.primary,
       ),
+      // Every state spelled out: ON = white knob on an orange track (the
+      // knob must never be orange too, or the switch reads as one blob);
+      // OFF = grey knob on a light track with a clearly visible outline.
       switchTheme: SwitchThemeData(
-        thumbColor: WidgetStateProperty.resolveWith(
-          (s) => s.contains(WidgetState.selected) ? Colors.white : null,
-        ),
-        trackColor: WidgetStateProperty.resolveWith(
-          (s) => s.contains(WidgetState.selected) ? AppColors.primary : null,
-        ),
-        trackOutlineColor: WidgetStateProperty.resolveWith(
-          (s) => s.contains(WidgetState.selected) ? AppColors.primary : null,
+        thumbColor: WidgetStateProperty.resolveWith((s) {
+          if (s.contains(WidgetState.disabled)) {
+            return dark ? const Color(0xFF52525B) : const Color(0xFFD4D4D8);
+          }
+          if (s.contains(WidgetState.selected)) return Colors.white;
+          return dark ? const Color(0xFFA1A1AA) : const Color(0xFF71717A);
+        }),
+        trackColor: WidgetStateProperty.resolveWith((s) {
+          if (s.contains(WidgetState.selected)) {
+            return s.contains(WidgetState.disabled)
+                ? AppColors.primary.withValues(alpha: 0.35)
+                : AppColors.primary;
+          }
+          return dark ? AppColors.darkSurfaceHigh : const Color(0xFFF1F1F3);
+        }),
+        trackOutlineColor: WidgetStateProperty.resolveWith((s) {
+          if (s.contains(WidgetState.selected)) return Colors.transparent;
+          return dark ? const Color(0xFF52525B) : const Color(0xFFA1A1AA);
+        }),
+        trackOutlineWidth: const WidgetStatePropertyAll(1.5),
+        thumbIcon: WidgetStateProperty.resolveWith(
+          (s) => s.contains(WidgetState.selected)
+              ? const Icon(
+                  Icons.check_rounded,
+                  size: 14,
+                  color: AppColors.primary,
+                )
+              : null,
         ),
       ),
       checkboxTheme: CheckboxThemeData(
         fillColor: WidgetStateProperty.resolveWith(
           (s) => s.contains(WidgetState.selected) ? AppColors.primary : null,
         ),
+        checkColor: const WidgetStatePropertyAll(Colors.white),
+        side: BorderSide(color: scheme.outline, width: 1.6),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
       ),
       radioTheme: RadioThemeData(
         fillColor: WidgetStateProperty.resolveWith(
-          (s) => s.contains(WidgetState.selected) ? AppColors.primary : null,
+          (s) => s.contains(WidgetState.selected)
+              ? AppColors.primary
+              : scheme.outline,
         ),
       ),
       chipTheme: ChipThemeData(

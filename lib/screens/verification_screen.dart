@@ -1,3 +1,4 @@
+import 'package:mcri_residents_app/widgets/app_loader.dart';
 import 'package:mcri_residents_app/theme/app_theme.dart';
 
 import 'dart:async';
@@ -140,7 +141,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
           style: TextStyle(fontSize: 14, color: AppColors.muted),
         ),
         const SizedBox(height: 40),
-        const Center(child: CircularProgressIndicator()),
+        const AppLoadingView(),
       ],
     );
   }

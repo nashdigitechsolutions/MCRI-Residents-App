@@ -1,3 +1,4 @@
+import 'package:mcri_residents_app/widgets/app_loader.dart';
 import 'package:mcri_residents_app/theme/app_theme.dart';
 
 import 'dart:convert';
@@ -747,7 +748,6 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                         ),
                         value: _form.isStudent,
                         onChanged: (v) => setState(() => _form.isStudent = v),
-                        activeThumbColor: AppColors.primary,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -778,7 +778,6 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                         ),
                         value: _form.isAvailable,
                         onChanged: (v) => setState(() => _form.isAvailable = v),
-                        activeThumbColor: AppColors.primary,
                       ),
                     ),
                     if (_error != null) ...[
@@ -806,7 +805,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                                   ? SizedBox(
                                       height: 20,
                                       width: 20,
-                                      child: CircularProgressIndicator(
+                                      child: AppLoader(
                                         strokeWidth: 2,
                                         color: colors.surface,
                                       ),
@@ -1182,7 +1181,7 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
                         ? SizedBox(
                             height: 20,
                             width: 20,
-                            child: CircularProgressIndicator(
+                            child: AppLoader(
                               strokeWidth: 2,
                               color: colors.surface,
                             ),

@@ -1,3 +1,4 @@
+import 'package:mcri_residents_app/widgets/app_loader.dart';
 import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -372,7 +373,7 @@ class _DutiesScreenState extends State<DutiesScreen>
             : null,
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const AppLoadingView()
           : RefreshIndicator(
               onRefresh: _loadAll,
               child: ListView(
@@ -1344,7 +1345,7 @@ class _AssignDutySheetState extends State<_AssignDutySheet> {
                             ? SizedBox(
                                 height: 20,
                                 width: 20,
-                                child: CircularProgressIndicator(
+                                child: AppLoader(
                                   strokeWidth: 2,
                                   color: colors.surface,
                                 ),
@@ -1526,10 +1527,7 @@ class _AddToRosterSheetState extends State<_AddToRosterSheet> {
                     ? SizedBox(
                         height: 20,
                         width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: colors.surface,
-                        ),
+                        child: AppLoader(strokeWidth: 2, color: colors.surface),
                       )
                     : Text(
                         'Add',

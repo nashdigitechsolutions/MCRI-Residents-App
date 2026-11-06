@@ -1,3 +1,4 @@
+import 'package:mcri_residents_app/widgets/app_loader.dart';
 import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -167,7 +168,7 @@ class _RoomsScreenState extends State<RoomsScreen> {
             : null,
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const AppLoadingView()
           : RefreshIndicator(
               onRefresh: _loadAll,
               child: ListView(
@@ -404,7 +405,7 @@ class _RoomsScreenState extends State<RoomsScreen> {
                           ? SizedBox(
                               width: 16,
                               height: 16,
-                              child: CircularProgressIndicator(
+                              child: AppLoader(
                                 strokeWidth: 2,
                                 color: colors.onSurfaceVariant,
                               ),
@@ -579,10 +580,7 @@ class _NewRoomSheetState extends State<_NewRoomSheet> {
                     ? SizedBox(
                         height: 20,
                         width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: colors.surface,
-                        ),
+                        child: AppLoader(strokeWidth: 2, color: colors.surface),
                       )
                     : Text(
                         'Create room',
@@ -789,10 +787,7 @@ class _AssignSheetState extends State<_AssignSheet> {
                     ? SizedBox(
                         height: 20,
                         width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: colors.surface,
-                        ),
+                        child: AppLoader(strokeWidth: 2, color: colors.surface),
                       )
                     : Text(
                         'Assign',

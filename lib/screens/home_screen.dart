@@ -1,3 +1,4 @@
+import 'package:mcri_residents_app/widgets/app_loader.dart';
 import 'package:mcri_residents_app/theme/app_theme.dart';
 
 import 'dart:convert';
@@ -288,7 +289,7 @@ class _HomeScreenState extends State<HomeScreen> with LiveRefresh {
 
     return Scaffold(
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const AppLoadingView()
           : RefreshIndicator(
               onRefresh: _loadDashboard,
               child: ListView(
@@ -1627,10 +1628,7 @@ class _NewAnnouncementSheetState extends State<_NewAnnouncementSheet> {
                       ? const SizedBox(
                           width: 22,
                           height: 22,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
+                          child: AppLoader(strokeWidth: 2, color: Colors.white),
                         )
                       : const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -1844,7 +1842,7 @@ class _ReactionsViewerSheetState extends State<_ReactionsViewerSheet> {
               const SizedBox(height: 10),
               Expanded(
                 child: _loading
-                    ? const Center(child: CircularProgressIndicator())
+                    ? const AppLoadingView()
                     : _error != null
                     ? Center(
                         child: Text(

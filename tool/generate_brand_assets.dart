@@ -65,8 +65,13 @@ void main() {
   //    diagonal strokes): flutter test tool/render_monochrome_test.dart
 
   // 6. Notification icon as a vector drawable (crisp at every density).
-  File('android/app/src/main/res/drawable/ic_notification.xml')
-      .writeAsStringSync(_notificationVector());
+  //    Also written under OneSignal's default name so any push that doesn't
+  //    name an icon still shows the MCRI mark instead of OneSignal's bell.
+  //    (Both are protected from resource shrinking by res/raw/keep.xml.)
+  final vector = _notificationVector();
+  for (final name in ['ic_notification', 'ic_stat_onesignal_default']) {
+    File('android/app/src/main/res/drawable/$name.xml').writeAsStringSync(vector);
+  }
 
   stdout.writeln('Brand assets generated.');
 }

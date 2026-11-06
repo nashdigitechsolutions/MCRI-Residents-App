@@ -1,3 +1,4 @@
+import 'package:mcri_residents_app/widgets/app_loader.dart';
 import 'package:mcri_residents_app/config/env.dart';
 import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
@@ -426,10 +427,7 @@ class _LoginScreenState extends State<LoginScreen> {
               child: _submitting
                   ? const Padding(
                       padding: EdgeInsets.all(28),
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        color: Colors.white,
-                      ),
+                      child: AppLoader(strokeWidth: 2.5, color: Colors.white),
                     )
                   : const Icon(
                       Icons.fingerprint,

@@ -1,3 +1,4 @@
+import 'package:mcri_residents_app/widgets/app_loader.dart';
 import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 
@@ -37,7 +38,7 @@ class AppButton extends StatelessWidget {
             ? SizedBox(
                 height: 20,
                 width: 20,
-                child: CircularProgressIndicator(
+                child: AppLoader(
                   strokeWidth: 2,
                   color: isPrimary ? Colors.white : colors.onSurface,
                 ),

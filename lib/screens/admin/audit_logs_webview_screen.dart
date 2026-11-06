@@ -1,3 +1,4 @@
+import 'package:mcri_residents_app/widgets/app_loader.dart';
 import 'package:mcri_residents_app/config/env.dart';
 import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
@@ -90,8 +91,7 @@ class _AuditLogsWebViewScreenState extends State<AuditLogsWebViewScreen> {
       body: Stack(
         children: [
           WebViewWidget(controller: _controller),
-          if (_loading)
-            const Center(child: CircularProgressIndicator(color: _accent)),
+          if (_loading) const Center(child: AppLoader(color: _accent)),
         ],
       ),
     );

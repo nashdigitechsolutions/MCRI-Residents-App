@@ -1,3 +1,4 @@
+import 'package:mcri_residents_app/widgets/app_loader.dart';
 import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -273,7 +274,7 @@ class _EventsScreenState extends State<EventsScreen> {
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const AppLoadingView()
           : RefreshIndicator(
               onRefresh: _loadEvents,
               child: ListView(
@@ -1135,7 +1136,7 @@ class _AttendeesSheetState extends State<_AttendeesSheet> {
               const SizedBox(height: 12),
               Expanded(
                 child: _loading
-                    ? const Center(child: CircularProgressIndicator())
+                    ? const AppLoadingView()
                     : attendees.isEmpty
                     ? Center(
                         child: Text(
@@ -1547,7 +1548,7 @@ class _NewEventSheetState extends State<_NewEventSheet> {
                             ? SizedBox(
                                 height: 20,
                                 width: 20,
-                                child: CircularProgressIndicator(
+                                child: AppLoader(
                                   strokeWidth: 2,
                                   color: colors.surface,
                                 ),

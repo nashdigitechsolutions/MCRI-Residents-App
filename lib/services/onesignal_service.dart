@@ -2,6 +2,8 @@ import 'package:onesignal_flutter/onesignal_flutter.dart';
 
 /// Single wrapper around all OneSignal SDK calls.
 class OneSignalService {
+  OneSignalService._();
+
   static const _appId = '35d61ec6-616e-4b54-a68b-13dd397d0a1c';
 
   static void initialize() {
@@ -18,6 +20,26 @@ class OneSignalService {
   static void listenForTaps(void Function(Map<String, dynamic>? data) onTap) {
     OneSignal.Notifications.addClickListener((event) {
       onTap(event.notification.additionalData);
+    });
+  }
+
+  /// Fires when a push arrives while the app is open. The system
+  /// notification is suppressed and [onForeground] decides how to show it
+  /// (the in-app drop-down banner), unless it returns false, in which case
+  /// the system notification is displayed as normal.
+  static void listenForForeground(
+    bool Function(String title, String body, Map<String, dynamic>? data)
+    onForeground,
+  ) {
+    OneSignal.Notifications.addForegroundWillDisplayListener((event) {
+      final n = event.notification;
+      event.preventDefault();
+      final handled = onForeground(
+        n.title ?? '',
+        n.body ?? '',
+        n.additionalData,
+      );
+      if (!handled) n.display();
     });
   }
 

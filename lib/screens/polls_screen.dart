@@ -1,3 +1,4 @@
+import 'package:mcri_residents_app/widgets/app_loader.dart';
 import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -121,7 +122,7 @@ class _PollsScreenState extends State<PollsScreen> with LiveRefresh {
             : null,
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const AppLoadingView()
           : RefreshIndicator(
               onRefresh: () => _fetchPolls(showLoading: false),
               child: ListView(
@@ -513,10 +514,7 @@ class _VoteCardState extends State<_VoteCard> {
                     ? SizedBox(
                         height: 18,
                         width: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: colors.surface,
-                        ),
+                        child: AppLoader(strokeWidth: 2, color: colors.surface),
                       )
                     : Text(
                         poll.myOptionIds.isNotEmpty
@@ -985,7 +983,7 @@ class _VotersSheetState extends State<_VotersSheet> {
               const SizedBox(height: 10),
               Expanded(
                 child: _loading
-                    ? const Center(child: CircularProgressIndicator())
+                    ? const AppLoadingView()
                     : _error != null
                     ? Center(
                         child: Text(
@@ -1256,7 +1254,7 @@ class _ShareSheetState extends State<_ShareSheet> {
             if (_loading)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 20),
-                child: Center(child: CircularProgressIndicator()),
+                child: AppLoadingView(),
               )
             else ...[
               SizedBox(
@@ -1268,7 +1266,7 @@ class _ShareSheetState extends State<_ShareSheet> {
                       ? SizedBox(
                           height: 16,
                           width: 16,
-                          child: CircularProgressIndicator(
+                          child: AppLoader(
                             strokeWidth: 2,
                             color: colors.surface,
                           ),
@@ -1611,7 +1609,7 @@ class _NewPollSheetState extends State<_NewPollSheet> {
                             ? SizedBox(
                                 height: 20,
                                 width: 20,
-                                child: CircularProgressIndicator(
+                                child: AppLoader(
                                   strokeWidth: 2,
                                   color: colors.surface,
                                 ),
@@ -1796,7 +1794,7 @@ class _LunchboxSheetState extends State<_LunchboxSheet> {
                 const SizedBox(height: 12),
                 Expanded(
                   child: _loading
-                      ? const Center(child: CircularProgressIndicator())
+                      ? const AppLoadingView()
                       : _residents.isEmpty
                       ? Center(
                           child: Text(
@@ -1875,7 +1873,7 @@ class _LunchboxSheetState extends State<_LunchboxSheet> {
                                       ? SizedBox(
                                           width: 16,
                                           height: 16,
-                                          child: CircularProgressIndicator(
+                                          child: AppLoader(
                                             strokeWidth: 2,
                                             color: colors.onSurfaceVariant,
                                           ),

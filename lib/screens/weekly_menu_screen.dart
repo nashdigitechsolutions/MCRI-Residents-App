@@ -1,5 +1,6 @@
 // ignore_for_file: unnecessary_underscores
 
+import 'package:mcri_residents_app/widgets/app_loader.dart';
 import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -120,7 +121,7 @@ class _WeeklyMenuScreenState extends State<WeeklyMenuScreen> {
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const AppLoadingView()
           : RefreshIndicator(
               onRefresh: () => _fetchMenu(showLoading: false),
               child: ListView.builder(
@@ -494,10 +495,7 @@ class _EditMenuSheetState extends State<_EditMenuSheet> {
                     ? SizedBox(
                         height: 20,
                         width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: colors.surface,
-                        ),
+                        child: AppLoader(strokeWidth: 2, color: colors.surface),
                       )
                     : Text(
                         'Save full week',

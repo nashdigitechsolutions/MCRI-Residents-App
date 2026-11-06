@@ -1,3 +1,4 @@
+import 'package:mcri_residents_app/widgets/app_loader.dart';
 import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -38,6 +39,9 @@ class ConversationDetailScreen extends StatefulWidget {
   State<ConversationDetailScreen> createState() =>
       _ConversationDetailScreenState();
 
+  /// The chat currently on screen, so notifications for it can be skipped.
+  static int? openConversationId;
+
   static void clearCache() {
     _messageCache.clear();
   }
@@ -57,6 +61,18 @@ class _ConversationDetailScreenState extends State<ConversationDetailScreen> {
   ChatMessage? _editingMsg;
   final _textController = TextEditingController();
   final _scrollController = ScrollController();
+
+  // ── In-chat search ──
+  bool _searching = false;
+  String _query = '';
+  List<int> _hits = []; // message ids, oldest → newest
+  int _hitIndex = -1;
+  final _searchController = TextEditingController();
+  final _searchFocus = FocusNode();
+  final Map<int, GlobalKey> _bubbleKeys = {};
+  GlobalKey _keyFor(int id) => _bubbleKeys.putIfAbsent(id, GlobalKey.new);
+  int? get _currentHitId =>
+      _hitIndex >= 0 && _hitIndex < _hits.length ? _hits[_hitIndex] : null;
   DateTime _lastTypingSent = DateTime.fromMillisecondsSinceEpoch(0);
 
   late final void Function(dynamic) _onMessage;
@@ -72,6 +88,7 @@ class _ConversationDetailScreenState extends State<ConversationDetailScreen> {
   @override
   void initState() {
     super.initState();
+    ConversationDetailScreen.openConversationId = widget.conversationId;
     final cached =
         ConversationDetailScreen._messageCache[widget.conversationId];
     if (cached != null) {
@@ -228,6 +245,9 @@ class _ConversationDetailScreenState extends State<ConversationDetailScreen> {
 
   @override
   void dispose() {
+    if (ConversationDetailScreen.openConversationId == widget.conversationId) {
+      ConversationDetailScreen.openConversationId = null;
+    }
     ConversationDetailScreen._messageCache[widget.conversationId] = _messages
         .where((m) => m.messageId > 0)
         .toList();
@@ -241,6 +261,8 @@ class _ConversationDetailScreenState extends State<ConversationDetailScreen> {
     _unread.setActiveConversation(null);
     _textController.dispose();
     _scrollController.dispose();
+    _searchController.dispose();
+    _searchFocus.dispose();
     super.dispose();
   }
 
@@ -835,6 +857,60 @@ class _ConversationDetailScreenState extends State<ConversationDetailScreen> {
     return false;
   }
 
+  PreferredSizeWidget _buildSearchBar(ColorScheme colors) {
+    final total = _hits.length;
+    final label = _query.isEmpty
+        ? ''
+        : (total == 0 ? 'No matches' : '${_hitIndex + 1} of $total');
+    return AppBar(
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back),
+        tooltip: 'Close search',
+        onPressed: _toggleSearch,
+      ),
+      titleSpacing: 0,
+      title: TextField(
+        controller: _searchController,
+        focusNode: _searchFocus,
+        onChanged: _runSearch,
+        textInputAction: TextInputAction.search,
+        onSubmitted: (_) => _stepHit(older: true),
+        style: TextStyle(fontSize: 15, color: colors.onSurface),
+        decoration: const InputDecoration(
+          hintText: 'Search messages',
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          filled: false,
+          isDense: true,
+        ),
+      ),
+      actions: [
+        if (label.isNotEmpty)
+          Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: total == 0 ? colors.error : colors.onSurfaceVariant,
+              ),
+            ),
+          ),
+        IconButton(
+          tooltip: 'Older match',
+          onPressed: total > 1 ? () => _stepHit(older: true) : null,
+          icon: const Icon(Icons.keyboard_arrow_up_rounded),
+        ),
+        IconButton(
+          tooltip: 'Newer match',
+          onPressed: total > 1 ? () => _stepHit(older: false) : null,
+          icon: const Icon(Icons.keyboard_arrow_down_rounded),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
@@ -844,83 +920,125 @@ class _ConversationDetailScreenState extends State<ConversationDetailScreen> {
     final otherPhone = !_isGroup ? _otherMember?.phone : null;
 
     return Scaffold(
-      appBar: AppBar(
-        titleSpacing: 0,
-        title: InkWell(
-          onTap: () {
-            if (!_isGroup && _otherMember != null) {
-              _openMemberSheet(_otherMember!);
-            }
-          },
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 17,
-                backgroundColor: _accent,
-                child: Text(
-                  _isGroup ? 'G' : (_otherMember?.initials ?? 'C'),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
+      appBar: _searching
+          ? _buildSearchBar(colors)
+          : AppBar(
+              titleSpacing: 0,
+              title: InkWell(
+                onTap: () {
+                  if (!_isGroup && _otherMember != null) {
+                    _openMemberSheet(_otherMember!);
+                  }
+                },
+                child: Row(
                   children: [
-                    Text(
-                      headerName,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
+                    CircleAvatar(
+                      radius: 17,
+                      backgroundColor: _accent,
+                      child: Text(
+                        _isGroup ? 'G' : (_otherMember?.initials ?? 'C'),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                      overflow: TextOverflow.ellipsis,
                     ),
-                    Text(
-                      _typingUserIds.isNotEmpty
-                          ? '${_typingUserIds.map((id) => _memberName(id)?.split(' ').first ?? '').join(', ')} typing…'
-                          : (_isGroup
-                                ? '${_members.length} members'
-                                : (_otherMember?.isAvailable == true
-                                      ? 'Available'
-                                      : 'Tap to view profile')),
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        color: _typingUserIds.isNotEmpty
-                            ? _accent
-                            : colors.onSurfaceVariant,
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            headerName,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            _typingUserIds.isNotEmpty
+                                ? '${_typingUserIds.map((id) => _memberName(id)?.split(' ').first ?? '').join(', ')} typing…'
+                                : (_isGroup
+                                      ? '${_members.length} members'
+                                      : (_otherMember?.isAvailable == true
+                                            ? 'Available'
+                                            : 'Tap to view profile')),
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              color: _typingUserIds.isNotEmpty
+                                  ? _accent
+                                  : colors.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
-        ),
-        actions: [
-          if (!_isGroup && otherPhone != null)
-            IconButton(
-              onPressed: () => _openWhatsApp(otherPhone),
-              // Updated to use the FontAwesome WhatsApp icon
-              icon: const FaIcon(
-                FontAwesomeIcons.whatsapp,
-                color: _whatsappGreen,
-              ),
-              tooltip: 'WhatsApp',
+              actions: [
+                if (!_isGroup && otherPhone != null)
+                  IconButton(
+                    onPressed: () => _openWhatsApp(otherPhone),
+                    // Updated to use the FontAwesome WhatsApp icon
+                    icon: const FaIcon(
+                      FontAwesomeIcons.whatsapp,
+                      color: _whatsappGreen,
+                    ),
+                    tooltip: 'WhatsApp',
+                  ),
+                IconButton(
+                  onPressed: _toggleSearch,
+                  icon: const Icon(Icons.search_rounded),
+                  tooltip: 'Search in chat',
+                ),
+                IconButton(
+                  onPressed: () => setState(() => _showMembers = !_showMembers),
+                  icon: const Icon(Icons.people_outline),
+                ),
+              ],
             ),
-          IconButton(
-            onPressed: () => setState(() => _showMembers = !_showMembers),
-            icon: const Icon(Icons.people_outline),
-          ),
-        ],
-      ),
       body: Column(
         children: [
-          if (_loading) const LinearProgressIndicator(minHeight: 2),
+          // Refreshing over cached messages: a small, non-blocking pill.
+          AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            child: _loading && _messages.isNotEmpty
+                ? Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: colors.surface,
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(color: colors.outlineVariant),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const AppLoader(size: 14),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Updating…',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: colors.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  )
+                : const SizedBox(width: double.infinity),
+          ),
           if (pinned.isNotEmpty)
             Container(
               width: double.infinity,
@@ -980,7 +1098,7 @@ class _ConversationDetailScreenState extends State<ConversationDetailScreen> {
           Expanded(
             child: _messages.isEmpty
                 ? (_loading
-                      ? const SizedBox.shrink()
+                      ? const AppLoadingView(message: 'Loading messages…')
                       : Center(
                           child: Text(
                             'No messages yet — say hello 👋',
@@ -1029,28 +1147,43 @@ class _ConversationDetailScreenState extends State<ConversationDetailScreen> {
                                 ),
                               ),
                             ),
-                          _MessageBubble(
-                            key: ValueKey(msg.messageId),
-                            message: msg,
-                            mine: mine,
-                            senderName: !mine && _isGroup
-                                ? _memberName(msg.senderId)
-                                : null,
-                            replyFromName: msg.replySenderId != null
-                                ? _memberName(msg.replySenderId!)
-                                : null,
-                            seen:
-                                isLastOfMine &&
-                                !msg.isDeleted &&
-                                _isSeenByOthers(msg),
-                            onLongPress: () => _openActionMenu(msg),
-                            onSwipeReply: () => _startReply(msg),
-                            onReplyTap: msg.replyToMessageId != null
-                                ? () => _scrollToMessage(msg.replyToMessageId!)
-                                : null,
-                            onReactTap: (emoji) => _react(msg.messageId, emoji),
-                            onReactionLongPress: (emoji, names) =>
-                                _showReactionViewer(emoji, names),
+                          AnimatedContainer(
+                            key: _keyFor(msg.messageId),
+                            duration: const Duration(milliseconds: 250),
+                            decoration: BoxDecoration(
+                              color: _currentHitId == msg.messageId
+                                  ? _accent.withValues(alpha: 0.12)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(AppRadius.md),
+                            ),
+                            child: _MessageBubble(
+                              key: ValueKey(msg.messageId),
+                              message: msg,
+                              mine: mine,
+                              highlight: _searching && _query.isNotEmpty
+                                  ? _query
+                                  : null,
+                              senderName: !mine && _isGroup
+                                  ? _memberName(msg.senderId)
+                                  : null,
+                              replyFromName: msg.replySenderId != null
+                                  ? _memberName(msg.replySenderId!)
+                                  : null,
+                              seen:
+                                  isLastOfMine &&
+                                  !msg.isDeleted &&
+                                  _isSeenByOthers(msg),
+                              onLongPress: () => _openActionMenu(msg),
+                              onSwipeReply: () => _startReply(msg),
+                              onReplyTap: msg.replyToMessageId != null
+                                  ? () =>
+                                        _scrollToMessage(msg.replyToMessageId!)
+                                  : null,
+                              onReactTap: (emoji) =>
+                                  _react(msg.messageId, emoji),
+                              onReactionLongPress: (emoji, names) =>
+                                  _showReactionViewer(emoji, names),
+                            ),
                           ),
                         ],
                       );
@@ -1156,10 +1289,20 @@ class _ConversationDetailScreenState extends State<ConversationDetailScreen> {
                       color: _accent,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
-                      Icons.send,
-                      color: Colors.white,
-                      size: 18,
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 150),
+                      child: _sending
+                          ? const Padding(
+                              key: ValueKey('sending'),
+                              padding: EdgeInsets.all(10),
+                              child: AppLoader(color: Colors.white),
+                            )
+                          : const Icon(
+                              Icons.send,
+                              key: ValueKey('send'),
+                              color: Colors.white,
+                              size: 18,
+                            ),
                     ),
                   ),
                 ),
@@ -1182,21 +1325,96 @@ class _ConversationDetailScreenState extends State<ConversationDetailScreen> {
     return DateFormat.yMMMMd().format(d);
   }
 
+  /// Opens/closes search. Results are computed over the loaded history.
+  void _toggleSearch() {
+    setState(() {
+      _searching = !_searching;
+      if (!_searching) {
+        _query = '';
+        _hits = [];
+        _hitIndex = -1;
+        _searchController.clear();
+      }
+    });
+    if (_searching) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _searchFocus.requestFocus(),
+      );
+    }
+  }
+
+  void _runSearch(String q) {
+    final needle = q.trim().toLowerCase();
+    final hits = needle.isEmpty
+        ? <int>[]
+        : _messages
+              .where(
+                (m) =>
+                    !m.isDeleted &&
+                    (m.message ?? '').toLowerCase().contains(needle),
+              )
+              .map((m) => m.messageId)
+              .toList();
+    setState(() {
+      _query = q.trim();
+      _hits = hits;
+      _hitIndex = hits.isEmpty ? -1 : hits.length - 1; // newest match first
+    });
+    if (hits.isNotEmpty) _jumpToHit();
+  }
+
+  /// [older] = true moves up the conversation (earlier messages).
+  void _stepHit({required bool older}) {
+    if (_hits.isEmpty) return;
+    setState(() {
+      _hitIndex = older
+          ? (_hitIndex - 1 + _hits.length) % _hits.length
+          : (_hitIndex + 1) % _hits.length;
+    });
+    _jumpToHit();
+  }
+
+  void _jumpToHit() {
+    final id = _currentHitId;
+    if (id != null) _scrollToMessage(id);
+  }
+
   void _scrollToMessage(int messageId) {
     final index = _messages.indexWhere((m) => m.messageId == messageId);
     if (index == -1) return;
-    // Approximate scroll — ListView.builder doesn't give exact offsets
-    // without a fixed item extent, so this jumps proportionally rather
-    // than pixel-precisely. Good enough to bring the message on-screen.
+    // Already built (on/near screen)? Snap straight to it.
+    final ctx = _bubbleKeys[messageId]?.currentContext;
+    if (ctx != null) {
+      Scrollable.ensureVisible(
+        ctx,
+        alignment: 0.35,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+      );
+      return;
+    }
+    // Otherwise scroll near it (items are lazily built), then snap.
     if (_scrollController.hasClients) {
       final target =
           (_scrollController.position.maxScrollExtent) *
           (index / _messages.length);
-      _scrollController.animateTo(
-        target.clamp(0, _scrollController.position.maxScrollExtent),
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
+      _scrollController
+          .animateTo(
+            target.clamp(0, _scrollController.position.maxScrollExtent),
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeOut,
+          )
+          .then((_) {
+            final c = _bubbleKeys[messageId]?.currentContext;
+            if (c != null && c.mounted) {
+              Scrollable.ensureVisible(
+                c,
+                alignment: 0.35,
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+              );
+            }
+          });
     }
   }
 }
@@ -1214,6 +1432,9 @@ class _MessageBubble extends StatefulWidget {
   final void Function(String emoji) onReactTap;
   final void Function(String emoji, List<String> names) onReactionLongPress;
 
+  /// Search term to highlight inside the message text, if searching.
+  final String? highlight;
+
   const _MessageBubble({
     super.key,
     required this.message,
@@ -1226,6 +1447,7 @@ class _MessageBubble extends StatefulWidget {
     this.onReplyTap,
     required this.onReactTap,
     required this.onReactionLongPress,
+    this.highlight,
   });
 
   @override
@@ -1392,7 +1614,11 @@ class _MessageBubbleState extends State<_MessageBubble> {
                                     : colors.onSurface,
                               ),
                               children: [
-                                TextSpan(text: msg.message ?? ''),
+                                ..._highlighted(
+                                  msg.message ?? '',
+                                  widget.highlight,
+                                  widget.mine,
+                                ),
                                 if (msg.editedAt != null)
                                   TextSpan(
                                     text: '  (edited)',
@@ -1683,4 +1909,32 @@ class _MemberSheet extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Splits [text] into spans with every case-insensitive occurrence of
+/// [query] highlighted in brand orange.
+List<InlineSpan> _highlighted(String text, String? query, bool mine) {
+  if (query == null || query.isEmpty) return [TextSpan(text: text)];
+  final lower = text.toLowerCase();
+  final q = query.toLowerCase();
+  final spans = <InlineSpan>[];
+  var start = 0;
+  while (true) {
+    final i = lower.indexOf(q, start);
+    if (i < 0) break;
+    if (i > start) spans.add(TextSpan(text: text.substring(start, i)));
+    spans.add(
+      TextSpan(
+        text: text.substring(i, i + q.length),
+        style: TextStyle(
+          fontWeight: FontWeight.w700,
+          color: AppColors.ink,
+          backgroundColor: mine ? Colors.white : AppColors.primaryBorder,
+        ),
+      ),
+    );
+    start = i + q.length;
+  }
+  if (start < text.length) spans.add(TextSpan(text: text.substring(start)));
+  return spans;
 }

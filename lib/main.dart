@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import 'navigation/app_navigator.dart';
 import 'providers/auth_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/unread_provider.dart';
@@ -16,6 +17,7 @@ import 'services/notification_router.dart';
 import 'services/onesignal_service.dart';
 import 'theme/app_theme.dart';
 import 'widgets/animated_splash.dart';
+import 'widgets/in_app_banner.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,9 +31,6 @@ void main() {
   OneSignalService.initialize();
   runApp(const MyApp());
 }
-
-final navigatorKey = GlobalKey<NavigatorState>();
-final scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
 
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
@@ -58,9 +57,29 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   void initState() {
     super.initState();
 
-    OneSignalService.listenForTaps((data) {
-      final ctx = navigatorKey.currentContext;
-      if (ctx != null) NotificationRouter.handle(ctx, data);
+    // Push tapped (cold start, background or foreground): open its screen.
+    // The router holds the route until the shell is ready.
+    OneSignalService.listenForTaps(NotificationRouter.open);
+
+    // Push arrived while the app is open: WhatsApp-style drop-down banner,
+    // unless it's for the chat the user is already looking at.
+    OneSignalService.listenForForeground((title, body, data) {
+      final convo = data?['conversation_id'];
+      final convoId = convo is int ? convo : int.tryParse('$convo');
+      if (convoId != null &&
+          convoId == ConversationDetailScreen.openConversationId) {
+        return true; // already visible; swallow silently
+      }
+      if (!_authProvider.isLoggedIn) return false;
+      InAppBanner.show(
+        title: title,
+        body: body,
+        data: data,
+        icon: data?['screen'] == 'conversation'
+            ? Icons.chat_bubble_rounded
+            : Icons.notifications_rounded,
+      );
+      return true;
     });
 
     _authProvider.addListener(_onAuthChanged);
@@ -119,6 +138,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       _unreadProvider.reset();
       ConversationDetailScreen.clearCache();
       navigatorKey.currentState?.popUntil((r) => r.isFirst);
+      shellTab.value = ShellTab.home;
       if (_authProvider.consumeSessionExpired()) {
         scaffoldMessengerKey.currentState?.showSnackBar(
           const SnackBar(

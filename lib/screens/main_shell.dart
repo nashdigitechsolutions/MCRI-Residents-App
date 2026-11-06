@@ -7,6 +7,8 @@ import '../providers/websocket_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/ui.dart';
+import '../navigation/app_navigator.dart';
+import '../services/notification_router.dart';
 import 'conversation_screen.dart';
 import 'home_screen.dart';
 import 'more_screen.dart';
@@ -68,22 +70,42 @@ class _MainShellState extends State<MainShell> {
     ),
   ];
 
-  static const _homeIndex = 2;
+  static const _homeIndex = ShellTab.home;
 
-  // Home is the middle tab and the default on launch.
-  int _currentIndex = _homeIndex;
+  // Home is the middle tab and the default on launch. The shared [shellTab]
+  // notifier lets notification taps switch tabs too.
+  int get _currentIndex => shellTab.value;
 
   // Tabs are only built the first time they're opened (then kept alive), so
   // launch only pays for the Home screen's network calls, not all five.
-  final _built = <int>{_homeIndex};
+  late final _built = <int>{_homeIndex, shellTab.value};
+
+  @override
+  void initState() {
+    super.initState();
+    shellTab.addListener(_onTabChanged);
+    // Signed in and on screen: queued notification taps can open now.
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => NotificationRouter.markReady(),
+    );
+  }
+
+  @override
+  void dispose() {
+    shellTab.removeListener(_onTabChanged);
+    NotificationRouter.markNotReady();
+    super.dispose();
+  }
+
+  void _onTabChanged() {
+    if (!mounted) return;
+    setState(() => _built.add(shellTab.value));
+  }
 
   void _select(int i) {
     if (i == _currentIndex) return;
     HapticFeedback.selectionClick();
-    setState(() {
-      _currentIndex = i;
-      _built.add(i);
-    });
+    shellTab.value = i;
   }
 
   @override

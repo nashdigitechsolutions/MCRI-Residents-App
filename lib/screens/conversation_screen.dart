@@ -1,3 +1,4 @@
+import 'package:mcri_residents_app/widgets/app_loader.dart';
 import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -230,7 +231,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
       body: Stack(
         children: [
           _loading
-              ? const Center(child: CircularProgressIndicator())
+              ? const AppLoadingView()
               : RefreshIndicator(
                   onRefresh: () => _fetch(showLoading: false),
                   child: ListView(
@@ -500,7 +501,7 @@ class _ConversationRow extends StatelessWidget {
                   const SizedBox(
                     width: 16,
                     height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: AppLoader(strokeWidth: 2),
                   )
                 else if (conversation.lastActivityAt != null)
                   Text(
@@ -731,7 +732,7 @@ class _NewConversationSheetState extends State<_NewConversationSheet> {
               child: _loading
                   ? const Padding(
                       padding: EdgeInsets.symmetric(vertical: 30),
-                      child: Center(child: CircularProgressIndicator()),
+                      child: AppLoadingView(),
                     )
                   : _filteredUsers.isEmpty
                   ? Padding(
@@ -872,10 +873,7 @@ class _NewConversationSheetState extends State<_NewConversationSheet> {
                     ? SizedBox(
                         height: 20,
                         width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: colors.surface,
-                        ),
+                        child: AppLoader(strokeWidth: 2, color: colors.surface),
                       )
                     : Text(
                         'Start conversation',

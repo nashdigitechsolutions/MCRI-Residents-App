@@ -1,3 +1,4 @@
+import 'package:mcri_residents_app/widgets/app_loader.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
@@ -329,7 +330,7 @@ class OfflineBanner extends StatelessWidget {
                   SizedBox(
                     width: 12,
                     height: 12,
-                    child: CircularProgressIndicator(
+                    child: AppLoader(
                       strokeWidth: 1.6,
                       color: AppColors.primary,
                     ),

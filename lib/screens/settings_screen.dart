@@ -1,3 +1,4 @@
+import 'package:mcri_residents_app/widgets/app_loader.dart';
 import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -31,7 +32,7 @@ class SettingsScreen extends StatelessWidget {
 
     return Scaffold(
       body: !settings.loaded
-          ? const Center(child: CircularProgressIndicator())
+          ? const AppLoadingView()
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
               children: [
@@ -258,11 +259,7 @@ class _SwitchRow extends StatelessWidget {
               ],
             ),
           ),
-          Switch(
-            value: value,
-            onChanged: onChanged,
-            activeThumbColor: AppColors.primary,
-          ),
+          Switch(value: value, onChanged: onChanged),
         ],
       ),
     );
