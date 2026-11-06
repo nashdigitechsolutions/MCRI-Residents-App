@@ -1,7 +1,7 @@
-class ApiConstants {
-  static const String baseUrl =
-      'https://mcri-residents-api.nashdigitechsolutions.workers.dev/api';
+import 'config/env.dart';
 
-  static const String wsUrl =
-      'wss://mcri-residents-api.nashdigitechsolutions.workers.dev/api/ws';
+/// Kept for backwards compatibility — prefer [AppConfig] directly.
+class ApiConstants {
+  static const String baseUrl = AppConfig.apiBaseUrl;
+  static const String wsUrl = AppConfig.wsUrl;
 }

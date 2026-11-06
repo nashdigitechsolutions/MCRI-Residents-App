@@ -1,3 +1,4 @@
+import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -8,10 +9,10 @@ import '../rooms_screen.dart';
 import '../polls_screen.dart';
 import 'admin_roles_screen.dart';
 
-const _red = Color(0xFFEF4444);
-const _accent = Color(0xFF3355FF);
-const _amber = Color(0xFFD97706);
-const _green = Color(0xFF10B981);
+const _red = AppColors.danger;
+const _accent = AppColors.primary;
+const _amber = AppColors.warning;
+const _green = AppColors.success;
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});

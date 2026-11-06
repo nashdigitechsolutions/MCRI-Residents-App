@@ -4,11 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-import 'package:mcri_residents_app/config/env.dart'; // contains wsUrl constant
-
-// directory for config is lib/config/env.dart
-// This file is not included in the repository for security reasons. Please create your own config/env.dart file with the following content:
-// const String wsUrl = 'wss://your-websocket-server-url';
+import '../config/env.dart';
 
 const _pingInterval = Duration(seconds: 25);
 const _pongTimeout = Duration(seconds: 10);
@@ -76,7 +72,9 @@ class WebSocketProvider extends ChangeNotifier {
     if (_token == null) return;
     final myGeneration = ++_generation;
 
-    final uri = Uri.parse('$wsUrl?token=${Uri.encodeComponent(_token!)}');
+    final uri = Uri.parse(
+      '${AppConfig.wsUrl}?token=${Uri.encodeComponent(_token!)}',
+    );
     final channel = WebSocketChannel.connect(uri);
     _channel = channel;
 

@@ -50,4 +50,4 @@ app.*.map.json
 # CocoaPods related
 pods/
 dart_tool/
-cocoapods/
+cocoapods//android/build/

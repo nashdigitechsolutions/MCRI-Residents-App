@@ -1,3 +1,5 @@
+import 'package:mcri_residents_app/theme/app_theme.dart';
+
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -15,8 +17,8 @@ import '../services/api_service.dart';
 import '../services/storage_service.dart';
 import '../utils/initials.dart';
 
-const _red = Color(0xFFEF4444);
-const _green = Color(0xFF10B981);
+const _red = AppColors.danger;
+const _green = AppColors.success;
 const _currentYear = 2026; // update yearly, or compute via DateTime.now().year
 const _minYear = 1900;
 const _maxYear = 2100;
@@ -143,7 +145,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               children: [
                 CircleAvatar(
                   radius: 32,
-                  backgroundColor: const Color(0xFF3355FF),
+                  backgroundColor: AppColors.primary,
                   child: Text(
                     initialsFor(displayName),
                     style: const TextStyle(
@@ -402,10 +404,15 @@ class _InfoRow extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: TextStyle(fontSize: 13, color: colors.onSurfaceVariant),
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 13, color: colors.onSurfaceVariant),
+          ),
         ),
+        const SizedBox(width: 12),
         Flexible(
           child: Text(
             value.isNotEmpty ? value : 'Not set',
@@ -740,7 +747,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                         ),
                         value: _form.isStudent,
                         onChanged: (v) => setState(() => _form.isStudent = v),
-                        activeThumbColor: const Color(0xFF3355FF),
+                        activeThumbColor: AppColors.primary,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -771,7 +778,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                         ),
                         value: _form.isAvailable,
                         onChanged: (v) => setState(() => _form.isAvailable = v),
-                        activeThumbColor: const Color(0xFF3355FF),
+                        activeThumbColor: AppColors.primary,
                       ),
                     ),
                     if (_error != null) ...[
@@ -907,7 +914,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF3355FF)),
+        borderSide: const BorderSide(color: AppColors.primary),
       ),
     );
   }
@@ -1110,7 +1117,7 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
                     ],
                     style: const TextStyle(
                       fontSize: 14.5,
-                      color: Color(0xFF6B7280),
+                      color: AppColors.muted,
                     ),
                     decoration: appFieldDecoration(
                       hint: 'Email',

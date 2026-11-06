@@ -1,3 +1,5 @@
+import 'package:mcri_residents_app/theme/app_theme.dart';
+
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -24,9 +26,9 @@ import 'admin/admin_roles_screen.dart';
 import 'notifications_screen.dart';
 import '../providers/unread_provider.dart';
 
-const _accent = Color(0xFF3355FF);
-const _red = Color(0xFFEF4444);
-const _amber = Color(0xFFD97706);
+const _accent = AppColors.primary;
+const _red = AppColors.danger;
+const _amber = AppColors.warning;
 
 const _reactions = [
   (emoji: '👍', key: 'like', label: 'Like'),
@@ -71,8 +73,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadUsername() async {
     try {
       final data = await ApiService.get('/profile');
-
-      debugPrint('PROFILE RESPONSE: $data');
 
       final profile = data as Map<String, dynamic>;
       final username = profile['username']?.toString().trim();
@@ -297,7 +297,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       gradient: LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
-                        colors: [Color(0xFF0A0A0A), Color(0xFF1A1A2E), _accent],
+                        colors: [AppColors.ink, Color(0xFF1C1410), _accent],
                       ),
                     ),
                     child: Column(
@@ -313,7 +313,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   width: 4,
                                   height: 28,
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFE50914),
+                                    color: AppColors.primary,
                                     borderRadius: BorderRadius.circular(4),
                                   ),
                                 ),
@@ -402,11 +402,13 @@ class _HomeScreenState extends State<HomeScreen> {
                                   vertical: 6,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFE50914)
-                                      .withValues(alpha: 0.14),
+                                  color: AppColors.primary.withValues(
+                                    alpha: 0.14,
+                                  ),
                                   border: Border.all(
-                                    color: const Color(0xFFE50914)
-                                        .withValues(alpha: 0.4),
+                                    color: AppColors.primary.withValues(
+                                      alpha: 0.4,
+                                    ),
                                   ),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
@@ -415,7 +417,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   children: [
                                     Icon(
                                       Icons.shield_outlined,
-                                      color: Color(0xFFFF555D),
+                                      color: AppColors.primaryBorder,
                                       size: 14,
                                     ),
                                     SizedBox(width: 6),
@@ -947,10 +949,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 decoration: BoxDecoration(
                   color: _red,
                   shape: BoxShape.circle,
-                  border: Border.all(
-                    color: const Color(0xFF0A0A0A),
-                    width: 1.5,
-                  ),
+                  border: Border.all(color: AppColors.ink, width: 1.5),
                 ),
                 alignment: Alignment.center,
                 child: Text(
@@ -1094,19 +1093,25 @@ class _HomeScreenState extends State<HomeScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Row(
-          children: [
-            Icon(icon, size: 15, color: colors.onSurfaceVariant),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: colors.onSurfaceVariant,
+        Expanded(
+          child: Row(
+            children: [
+              Icon(icon, size: 15, color: colors.onSurfaceVariant),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         if (onViewAll != null)
           GestureDetector(

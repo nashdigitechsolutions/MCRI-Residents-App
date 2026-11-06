@@ -1,3 +1,4 @@
+import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -5,8 +6,8 @@ import '../models/house_rule.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 
-const _red = Color(0xFFEF4444);
-const _accent = Color(0xFF3355FF);
+const _red = AppColors.danger;
+const _accent = AppColors.primary;
 
 class HouseRulesScreen extends StatefulWidget {
   const HouseRulesScreen({super.key});

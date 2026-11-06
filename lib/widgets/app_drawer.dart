@@ -1,18 +1,13 @@
+import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:mcri_residents_app/screens/rooms_screen.dart';
-import 'package:mcri_residents_app/screens/house_rules_screen.dart';
-import 'package:mcri_residents_app/screens/events_screen.dart';
-import 'package:mcri_residents_app/screens/equipment_screen.dart';
-import 'package:mcri_residents_app/screens/duties_screen.dart';
-import 'package:mcri_residents_app/screens/weekly_menu_screen.dart';
-import 'package:mcri_residents_app/screens/admin/admin_dashboard_screen.dart';
 
+import '../navigation/destinations.dart';
 import '../providers/auth_provider.dart';
 
-const _accent = Color(0xFF3355FF);
-const _accentSoft = Color(0xFF6B7CFF);
-const _danger = Color(0xFFEF4444);
+const _accent = AppColors.primary;
+const _accentSoft = AppColors.primaryBorder;
+const _danger = AppColors.danger;
 
 class _DrawerItem {
   final IconData icon;
@@ -39,51 +34,26 @@ class _AppDrawerState extends State<AppDrawer>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
 
+  // Built from the shared list so the drawer and "All services" never drift.
   static final List<_DrawerItem> _items = [
-    _DrawerItem(
-      icon: Icons.meeting_room_outlined,
-      label: 'Rooms',
-      routeName: 'rooms',
-      screenBuilder: () => const RoomsScreen(),
-    ),
-    _DrawerItem(
-      icon: Icons.calendar_today_outlined,
-      label: 'Events',
-      routeName: 'events',
-      screenBuilder: () => const EventsScreen(),
-    ),
-    _DrawerItem(
-      icon: Icons.build_outlined,
-      label: 'Equipment',
-      routeName: 'equipment',
-      screenBuilder: () => const EquipmentScreen(),
-    ),
-    _DrawerItem(
-      icon: Icons.cleaning_services_outlined,
-      label: 'Duties',
-      routeName: 'duties',
-      screenBuilder: () => const DutiesScreen(),
-    ),
-    _DrawerItem(
-      icon: Icons.menu_book_outlined,
-      label: 'House rules',
-      routeName: 'house_rules',
-      screenBuilder: () => const HouseRulesScreen(),
-    ),
-    _DrawerItem(
-      icon: Icons.restaurant_outlined,
-      label: 'Weekly menu',
-      routeName: 'weekly_menu',
-      screenBuilder: () => const WeeklyMenuScreen(),
-    ),
+    for (final d in appDestinations.where((d) => !d.adminOnly))
+      _DrawerItem(
+        icon: d.icon,
+        label: d.label,
+        routeName: d.routeName,
+        screenBuilder: d.builder,
+      ),
   ];
 
-  static final _adminItem = _DrawerItem(
-    icon: Icons.admin_panel_settings_outlined,
-    label: 'Admin dashboard',
-    routeName: 'admin_dashboard',
-    screenBuilder: () => const AdminDashboardScreen(),
-  );
+  static final _adminItem = () {
+    final d = appDestinations.firstWhere((d) => d.adminOnly);
+    return _DrawerItem(
+      icon: d.icon,
+      label: d.label,
+      routeName: d.routeName,
+      screenBuilder: d.builder,
+    );
+  }();
 
   @override
   void initState() {

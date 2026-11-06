@@ -1,3 +1,4 @@
+import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
@@ -6,9 +7,9 @@ import '../widgets/app_button.dart';
 import '../widgets/app_text_field.dart';
 import '../widgets/slide_puzzle_captcha.dart';
 
-const _ink = Color(0xFF0A0A0A);
-const _sheet = Color(0xFFF7F6F3);
-const _muted = Color(0xFF6B7280);
+const _ink = AppColors.ink;
+const _sheet = AppColors.canvas;
+const _muted = AppColors.muted;
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -146,13 +147,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   Widget _buildHero(double height, double topInset) {
     return Container(
-      height: height,
+      constraints: BoxConstraints(minHeight: height),
       width: double.infinity,
       decoration: const BoxDecoration(
         gradient: RadialGradient(
           center: Alignment(0.9, -1.0),
           radius: 1.3,
-          colors: [Color(0xFF1C2B73), _ink],
+          colors: [AppColors.primaryDeep, _ink],
         ),
       ),
       child: Stack(
@@ -251,7 +252,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           ),
           child: const Icon(
             Icons.mark_email_read_outlined,
-            color: Color(0xFF10B981),
+            color: AppColors.success,
             size: 28,
           ),
         ),
@@ -312,7 +313,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFFE5E7EB)),
+              border: Border.all(color: AppColors.border),
             ),
             child: SlidePuzzleCaptcha(
               key: ValueKey(_captchaAttempt),
@@ -332,7 +333,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               ),
               child: Text(
                 _error!,
-                style: const TextStyle(color: Color(0xFFDC2626), fontSize: 13),
+                style: const TextStyle(
+                  color: AppColors.dangerDark,
+                  fontSize: 13,
+                ),
               ),
             ),
           ],

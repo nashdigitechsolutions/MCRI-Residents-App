@@ -1,3 +1,4 @@
+import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -7,7 +8,7 @@ import '../providers/unread_provider.dart';
 import '../providers/websocket_provider.dart';
 import '../services/api_service.dart';
 
-const _accent = Color(0xFF3355FF);
+const _accent = AppColors.primary;
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -21,6 +22,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   bool _loading = true;
   bool _markingAll = false;
   late final void Function(dynamic) _onNotification;
+
+  late final WebSocketProvider _ws;
 
   @override
   void initState() {
@@ -47,12 +50,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       });
       setState(() => _items = [incoming, ..._items]);
     };
-    context.read<WebSocketProvider>().on('notification', _onNotification);
+    _ws = context.read<WebSocketProvider>()
+      ..on('notification', _onNotification);
   }
 
   @override
   void dispose() {
-    context.read<WebSocketProvider>().off('notification', _onNotification);
+    _ws.off('notification', _onNotification);
     super.dispose();
   }
 

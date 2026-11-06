@@ -1,3 +1,5 @@
+import 'package:mcri_residents_app/theme/app_theme.dart';
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -110,7 +112,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F6F3),
+      backgroundColor: AppColors.canvas,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
@@ -135,7 +137,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
         const SizedBox(height: 6),
         const Text(
           'Just a moment while we confirm your email.',
-          style: TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
+          style: TextStyle(fontSize: 14, color: AppColors.muted),
         ),
         const SizedBox(height: 40),
         const Center(child: CircularProgressIndicator()),
@@ -154,7 +156,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
         const SizedBox(height: 6),
         const Text(
           'Your account is now active.',
-          style: TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
+          style: TextStyle(fontSize: 14, color: AppColors.muted),
         ),
         const SizedBox(height: 28),
         Container(
@@ -166,14 +168,14 @@ class _VerificationScreenState extends State<VerificationScreen> {
           ),
           child: const Icon(
             Icons.check_circle_outline,
-            color: Color(0xFF10B981),
+            color: AppColors.success,
             size: 28,
           ),
         ),
         const SizedBox(height: 16),
         const Text(
           'You can now sign in to your account.',
-          style: TextStyle(fontSize: 13.5, color: Color(0xFF6B7280)),
+          style: TextStyle(fontSize: 13.5, color: AppColors.muted),
         ),
         const SizedBox(height: 20),
         AppButton(
@@ -195,7 +197,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
         const SizedBox(height: 6),
         const Text(
           "We couldn't verify this link.",
-          style: TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
+          style: TextStyle(fontSize: 14, color: AppColors.muted),
         ),
         const SizedBox(height: 28),
         Container(
@@ -207,14 +209,14 @@ class _VerificationScreenState extends State<VerificationScreen> {
           ),
           child: const Icon(
             Icons.highlight_off,
-            color: Color(0xFFEF4444),
+            color: AppColors.danger,
             size: 28,
           ),
         ),
         const SizedBox(height: 12),
         Text(
           _message,
-          style: const TextStyle(fontSize: 13.5, color: Color(0xFF6B7280)),
+          style: const TextStyle(fontSize: 13.5, color: AppColors.muted),
         ),
         const SizedBox(height: 20),
         if (_resendSent)
@@ -229,7 +231,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
               children: [
                 Icon(
                   Icons.mark_email_read_outlined,
-                  color: Color(0xFF10B981),
+                  color: AppColors.success,
                   size: 22,
                 ),
                 SizedBox(height: 8),
@@ -244,7 +246,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
         else ...[
           const Text(
             'Enter your email to get a new verification link',
-            style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
+            style: TextStyle(fontSize: 12, color: AppColors.subtle),
           ),
           const SizedBox(height: 8),
           AppTextField(
@@ -256,7 +258,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
             const SizedBox(height: 6),
             Text(
               _resendError!,
-              style: const TextStyle(fontSize: 11.5, color: Color(0xFFEF4444)),
+              style: const TextStyle(fontSize: 11.5, color: AppColors.danger),
             ),
           ],
           const SizedBox(height: 12),

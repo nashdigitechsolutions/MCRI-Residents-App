@@ -1,3 +1,4 @@
+import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -6,9 +7,9 @@ import '../models/room.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 
-const _amber = Color(0xFFD97706);
-const _green = Color(0xFF10B981);
-const _red = Color(0xFFEF4444);
+const _amber = AppColors.warning;
+const _green = AppColors.success;
+const _red = AppColors.danger;
 
 class RoomsScreen extends StatefulWidget {
   const RoomsScreen({super.key});
@@ -375,7 +376,7 @@ class _RoomsScreenState extends State<RoomsScreen> {
                     ),
                     CircleAvatar(
                       radius: 12,
-                      backgroundColor: const Color(0xFF3355FF),
+                      backgroundColor: AppColors.primary,
                       child: Text(
                         o.displayName.isNotEmpty
                             ? o.displayName[0].toUpperCase()
@@ -825,7 +826,7 @@ InputDecoration _fieldDecoration(ColorScheme colors, {String? hint}) {
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
-      borderSide: const BorderSide(color: Color(0xFF3355FF)),
+      borderSide: const BorderSide(color: AppColors.primary),
     ),
   );
 }

@@ -1,3 +1,4 @@
+import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -9,10 +10,10 @@ import '../models/roster_entry.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 
-const _red = Color(0xFFEF4444);
-const _accent = Color(0xFF3355FF);
-const _amber = Color(0xFFD97706);
-const _green = Color(0xFF10B981);
+const _red = AppColors.danger;
+const _accent = AppColors.primary;
+const _amber = AppColors.warning;
+const _green = AppColors.success;
 const _residentRoleId = 2;
 
 const _days = [
@@ -67,92 +68,92 @@ class _DutiesScreenState extends State<DutiesScreen>
   /// Each source loads and fails independently — a broken roster route
   /// (e.g. not deployed yet) never blanks out duties, and vice versa.
   Future<void> _loadAll() async {
-  if (!mounted) return;
-
-  setState(() => _loading = true);
-
-  // Read the admin status before any async operations.
-  final isAdmin = _isAdmin;
-
-  try {
-    final data = await ApiService.get('/duties');
-
     if (!mounted) return;
 
-    setState(
-      () => _duties = (data as List)
-          .map((j) => Duty.fromJson(j as Map<String, dynamic>))
-          .toList(),
-    );
-  } catch (e) {
-    if (!mounted) return;
-    _notify('Could not load duties', isError: true);
-  }
+    setState(() => _loading = true);
 
-  if (!mounted) return;
+    // Read the admin status before any async operations.
+    final isAdmin = _isAdmin;
 
-  try {
-    final data = await ApiService.get('/duty-roster');
-
-    if (!mounted) return;
-
-    setState(
-      () => _roster = (data as List)
-          .map((j) => RosterEntry.fromJson(j as Map<String, dynamic>))
-          .toList(),
-    );
-  } on ApiException catch (e) {
-    if (!mounted) return;
-
-    _notify(
-      e.statusCode == 404
-          ? "Duty roster route not found — check it's registered on the backend"
-          : 'Could not load the duty roster',
-      isError: true,
-    );
-  } catch (e) {
-    if (!mounted) return;
-    _notify('Could not load the duty roster', isError: true);
-  }
-
-  if (!mounted) return;
-
-  if (isAdmin) {
     try {
-      final data = await ApiService.get('/residents');
+      final data = await ApiService.get('/duties');
 
       if (!mounted) return;
 
       setState(
-        () => _residents = (data as List)
-            .map((j) => Resident.fromJson(j as Map<String, dynamic>))
+        () => _duties = (data as List)
+            .map((j) => Duty.fromJson(j as Map<String, dynamic>))
             .toList(),
       );
     } catch (e) {
       if (!mounted) return;
-      // Non-fatal — room column just shows blank.
+      _notify('Could not load duties', isError: true);
     }
 
     if (!mounted) return;
 
     try {
-      final data = await ApiService.get('/users');
+      final data = await ApiService.get('/duty-roster');
 
       if (!mounted) return;
 
       setState(
-        () => _directory = (data as List).cast<Map<String, dynamic>>(),
+        () => _roster = (data as List)
+            .map((j) => RosterEntry.fromJson(j as Map<String, dynamic>))
+            .toList(),
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+
+      _notify(
+        e.statusCode == 404
+            ? "Duty roster route not found — check it's registered on the backend"
+            : 'Could not load the duty roster',
+        isError: true,
       );
     } catch (e) {
       if (!mounted) return;
-      _notify('Could not load the user directory', isError: true);
+      _notify('Could not load the duty roster', isError: true);
     }
+
+    if (!mounted) return;
+
+    if (isAdmin) {
+      try {
+        final data = await ApiService.get('/residents');
+
+        if (!mounted) return;
+
+        setState(
+          () => _residents = (data as List)
+              .map((j) => Resident.fromJson(j as Map<String, dynamic>))
+              .toList(),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        // Non-fatal — room column just shows blank.
+      }
+
+      if (!mounted) return;
+
+      try {
+        final data = await ApiService.get('/users');
+
+        if (!mounted) return;
+
+        setState(
+          () => _directory = (data as List).cast<Map<String, dynamic>>(),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        _notify('Could not load the user directory', isError: true);
+      }
+    }
+
+    if (!mounted) return;
+
+    setState(() => _loading = false);
   }
-
-  if (!mounted) return;
-
-  setState(() => _loading = false);
-}
 
   void _notify(String message, {bool isError = false}) {
     if (!mounted) return;
@@ -407,8 +408,11 @@ class _DutiesScreenState extends State<DutiesScreen>
                     ),
 
                   const SizedBox(height: 24),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 12,
+                    runSpacing: 8,
                     children: [
                       _sectionLabel(
                         colors,
@@ -422,6 +426,7 @@ class _DutiesScreenState extends State<DutiesScreen>
                           borderRadius: BorderRadius.circular(999),
                         ),
                         child: Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             _genderChip(colors, 'All', _GenderTab.all),
                             _genderChip(colors, 'Boys', _GenderTab.boys),
@@ -558,6 +563,7 @@ class _DutiesScreenState extends State<DutiesScreen>
 
   Widget _sectionLabel(ColorScheme colors, IconData icon, String label) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Icon(icon, size: 15, color: colors.onSurfaceVariant),
         const SizedBox(width: 6),

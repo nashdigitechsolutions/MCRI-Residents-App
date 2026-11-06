@@ -1,3 +1,4 @@
+import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 
 class AppButton extends StatelessWidget {
@@ -23,13 +24,13 @@ class AppButton extends StatelessWidget {
       child: ElevatedButton(
         onPressed: loading ? null : onPressed,
         style: ElevatedButton.styleFrom(
-          backgroundColor: isPrimary ? const Color(0xFF0A0A0A) : colors.surface,
+          backgroundColor: isPrimary ? AppColors.primary : colors.surface,
           foregroundColor: isPrimary ? Colors.white : colors.onSurface,
           side: isPrimary
               ? BorderSide.none
               : BorderSide(color: colors.outlineVariant),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(999),
+            borderRadius: BorderRadius.circular(AppRadius.sm + 2),
           ),
         ),
         child: loading

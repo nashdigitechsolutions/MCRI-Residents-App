@@ -1,3 +1,4 @@
+import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -118,12 +119,12 @@ class SettingsScreen extends StatelessWidget {
                     onPressed: () => context.read<AuthProvider>().logout(),
                     icon: const Icon(
                       Icons.logout,
-                      color: Color(0xFFDC2626),
+                      color: AppColors.dangerDark,
                       size: 18,
                     ),
                     label: const Text(
                       'Log out',
-                      style: TextStyle(color: Color(0xFFDC2626)),
+                      style: TextStyle(color: AppColors.dangerDark),
                     ),
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: Color(0xFFFECACA)),
@@ -260,7 +261,7 @@ class _SwitchRow extends StatelessWidget {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeThumbColor: const Color(0xFF3355FF),
+            activeThumbColor: AppColors.primary,
           ),
         ],
       ),

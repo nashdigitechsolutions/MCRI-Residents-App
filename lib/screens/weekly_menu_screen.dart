@@ -1,5 +1,6 @@
 // ignore_for_file: unnecessary_underscores
 
+import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -75,7 +76,7 @@ class _WeeklyMenuScreenState extends State<WeeklyMenuScreen> {
       SnackBar(
         content: Text(message),
         backgroundColor: isError
-            ? const Color(0xFFDC2626)
+            ? AppColors.dangerDark
             : null, // null = theme default
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
@@ -135,12 +136,12 @@ class _WeeklyMenuScreenState extends State<WeeklyMenuScreen> {
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: isToday
-                          ? const Color(0xFF3355FF).withOpacity(0.08)
+                          ? AppColors.primary.withValues(alpha: 0.08)
                           : colors.surface,
                       borderRadius: BorderRadius.circular(18),
                       border: Border.all(
                         color: isToday
-                            ? const Color(0xFF3355FF).withOpacity(0.3)
+                            ? AppColors.primary.withValues(alpha: 0.3)
                             : colors.outlineVariant,
                         width: isToday ? 1.5 : 1,
                       ),
@@ -166,7 +167,7 @@ class _WeeklyMenuScreenState extends State<WeeklyMenuScreen> {
                                   vertical: 3,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF3355FF),
+                                  color: AppColors.primary,
                                   borderRadius: BorderRadius.circular(999),
                                 ),
                                 child: const Text(
@@ -471,7 +472,10 @@ class _EditMenuSheetState extends State<_EditMenuSheet> {
               const SizedBox(height: 12),
               Text(
                 _error!,
-                style: const TextStyle(color: Color(0xFFDC2626), fontSize: 13),
+                style: const TextStyle(
+                  color: AppColors.dangerDark,
+                  fontSize: 13,
+                ),
               ),
             ],
             const SizedBox(height: 16),
@@ -550,7 +554,7 @@ class _EditMenuSheetState extends State<_EditMenuSheet> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFF3355FF)),
+              borderSide: const BorderSide(color: AppColors.primary),
             ),
           ),
         ),

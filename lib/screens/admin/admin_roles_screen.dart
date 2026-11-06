@@ -1,9 +1,10 @@
+import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 
 import '../../services/api_service.dart';
 
-const _red = Color(0xFFEF4444);
-const _accent = Color(0xFF3355FF);
+const _red = AppColors.danger;
+const _accent = AppColors.primary;
 
 enum _RolesTab { assign, manage }
 
@@ -218,7 +219,7 @@ class _AdminRolesScreenState extends State<AdminRolesScreen> {
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: const Color(0xFFD97706).withValues(alpha: 0.1),
+            color: AppColors.warning.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(14),
           ),
           child: const Row(
@@ -226,7 +227,7 @@ class _AdminRolesScreenState extends State<AdminRolesScreen> {
               Icon(
                 Icons.warning_amber_rounded,
                 size: 16,
-                color: Color(0xFFD97706),
+                color: AppColors.warning,
               ),
               SizedBox(width: 8),
               Expanded(

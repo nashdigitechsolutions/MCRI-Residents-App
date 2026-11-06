@@ -1,89 +1,87 @@
 import 'package:flutter/material.dart';
-import 'package:mcri_residents_app/utils/initials.dart';
 import 'package:provider/provider.dart';
 
+import '../navigation/destinations.dart';
 import '../providers/auth_provider.dart';
+import '../theme/app_theme.dart';
+import '../widgets/ui.dart';
 
-class MoreScreen extends StatelessWidget {
+/// "All services" hub, laid out like the reference onboarding screen:
+/// eyebrow → bold question-style heading → muted caption → card grid.
+class MoreScreen extends StatefulWidget {
   const MoreScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final auth = context.watch<AuthProvider>();
+  State<MoreScreen> createState() => _MoreScreenState();
+}
 
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        const Text(
-          'More',
-          style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 20),
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0xFFE7E5E0)),
-          ),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 22,
-                backgroundColor: const Color(0xFF3355FF),
-                child: Text(
-                  initialsFor(auth.user?.username ?? ''),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+class _MoreScreenState extends State<MoreScreen> {
+  String _query = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final isAdmin = context.select<AuthProvider, bool>((a) => a.isAdmin);
+    final q = _query.trim().toLowerCase();
+    final items = destinationsFor(isAdmin: isAdmin)
+        .where(
+          (d) =>
+              q.isEmpty ||
+              d.label.toLowerCase().contains(q) ||
+              d.caption.toLowerCase().contains(q),
+        )
+        .toList();
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('All services')),
+      body: SafeArea(
+        top: false,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
+          children: [
+            const PageHeading(
+              eyebrow: 'Resident services',
+              title: 'What would you like to do today?',
+              subtitle: 'Everything in your residence, one tap away.',
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            TextField(
+              onChanged: (v) => setState(() => _query = v),
+              textInputAction: TextInputAction.search,
+              decoration: const InputDecoration(
+                hintText: 'Search services',
+                prefixIcon: Icon(Icons.search, size: 20),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      auth.user?.username ?? '',
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    Text(
-                      auth.user?.email ?? '',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF6B7280),
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            SectionHeader(
+              isAdmin ? 'Resident & admin tools' : 'Resident tools',
+            ),
+            if (items.isEmpty)
+              const EmptyState(
+                icon: Icons.search_off_rounded,
+                title: 'No matching services',
+                message: 'Try a different word.',
+              )
+            else
+              OptionGrid(
+                children: [
+                  for (final d in items)
+                    OptionCard(
+                      icon: d.icon,
+                      title: d.label,
+                      subtitle: d.caption,
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          settings: RouteSettings(name: d.routeName),
+                          builder: (_) => d.builder(),
+                        ),
                       ),
                     ),
-                  ],
-                ),
+                ],
               ),
-            ],
-          ),
+          ],
         ),
-        const SizedBox(height: 24),
-        // (TODO: Rooms / Events / Equipment / Polls / Duties / House Rules /)
-        // Weekly Menu list rows go here once we build those screens.
-        const SizedBox(height: 8),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: () => context.read<AuthProvider>().logout(),
-            icon: const Icon(Icons.logout, color: Color(0xFFDC2626), size: 18),
-            label: const Text(
-              'Log out',
-              style: TextStyle(color: Color(0xFFDC2626)),
-            ),
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: Color(0xFFFECACA)),
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 }

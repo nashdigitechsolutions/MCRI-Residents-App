@@ -1,11 +1,12 @@
+import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 
-const kFieldAccent = Color(0xFF3355FF);
-const kFieldHint = Color(0xFF9CA3AF);
-const kFieldBorder = Color(0xFFE5E7EB);
-const kFieldError = Color(0xFFDC2626);
+const kFieldAccent = AppColors.primary;
+const kFieldHint = AppColors.subtle;
+const kFieldBorder = AppColors.border;
+const kFieldError = AppColors.dangerDark;
 
-/// Wraps a text field in a pill-shaped container that lifts with a soft
+/// Wraps a text field in a rounded container that lifts with a soft
 /// glow while focused. Shared by AppTextField and AppPasswordField so
 /// they always look identical.
 class AppFieldShell extends StatefulWidget {
@@ -56,7 +57,7 @@ class _AppFieldShellState extends State<AppFieldShell> {
       duration: const Duration(milliseconds: 200),
       curve: Curves.easeOut,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(AppRadius.sm + 2),
         boxShadow: [
           BoxShadow(
             color: _focused
@@ -83,7 +84,7 @@ InputDecoration appFieldDecoration({
 }) {
   OutlineInputBorder border(Color color, [double width = 1]) =>
       OutlineInputBorder(
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(AppRadius.sm + 2),
         borderSide: BorderSide(color: color, width: width),
       );
 
@@ -104,7 +105,7 @@ InputDecoration appFieldDecoration({
           ),
     suffixIcon: suffix,
     filled: true,
-    fillColor: enabled ? Colors.white : const Color(0xFFF3F4F6),
+    fillColor: enabled ? Colors.white : AppColors.fieldDisabled,
     contentPadding: EdgeInsets.symmetric(
       horizontal: icon == null ? 22 : 14,
       vertical: 16,

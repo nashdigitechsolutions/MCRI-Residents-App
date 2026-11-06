@@ -1,3 +1,4 @@
+import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:intl/intl.dart';
@@ -14,8 +15,8 @@ import '../providers/websocket_provider.dart';
 import '../services/api_service.dart';
 import '../widgets/emoji_picker.dart';
 
-const _accent = Color(0xFF3355FF);
-const _red = Color(0xFFEF4444);
+const _accent = AppColors.primary;
+const _red = AppColors.danger;
 const _whatsappGreen = Color(0xFF25D366);
 const _quickReactions = ['👍', '❤️', '😂', '🙏', '🔥', '🎉'];
 
@@ -1308,7 +1309,7 @@ class _MessageBubbleState extends State<_MessageBubble> {
                     decoration: BoxDecoration(
                       gradient: widget.mine
                           ? const LinearGradient(
-                              colors: [_accent, Color(0xFF2543E0)],
+                              colors: [_accent, AppColors.primaryDark],
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             )
@@ -1561,7 +1562,7 @@ class _MemberSheet extends StatelessWidget {
               decoration: BoxDecoration(
                 color:
                     (member.isAvailable!
-                            ? const Color(0xFF10B981)
+                            ? AppColors.success
                             : colors.onSurfaceVariant)
                         .withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(999),
@@ -1572,7 +1573,7 @@ class _MemberSheet extends StatelessWidget {
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
                   color: member.isAvailable!
-                      ? const Color(0xFF10B981)
+                      ? AppColors.success
                       : colors.onSurfaceVariant,
                 ),
               ),

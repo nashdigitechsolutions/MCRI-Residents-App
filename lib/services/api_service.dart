@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
-import '../constants.dart';
+import '../config/env.dart';
 import 'storage_service.dart';
 
 class ApiException implements Exception {
@@ -10,155 +13,191 @@ class ApiException implements Exception {
   final String message;
   ApiException(this.statusCode, this.message);
 
+  /// 0 = never reached the server (offline, DNS, timeout).
+  bool get isNetwork => statusCode == 0;
+  bool get isUnauthorized => statusCode == 401;
+
   @override
   String toString() => message;
 }
 
+/// Thin JSON client for the MCRI API.
+///
+/// - One persistent [http.Client] → connections are kept alive and reused
+///   (TLS handshake once instead of per request — the biggest speed win).
+/// - Every request has a timeout, so a dead network never hangs a spinner.
+/// - Idempotent GETs retry once on transient network failure.
+/// - A 401 on an authenticated request fires [onUnauthorized] so the app can
+///   sign the user out instead of showing a broken, half-logged-in state.
+/// - Non-JSON error bodies (e.g. a Cloudflare 502 page) no longer crash.
 class ApiService {
-  static Future<Map<String, String>> _headers() async {
+  ApiService._();
+
+  static http.Client _client = http.Client();
+
+  /// Set by AuthProvider: called when the server rejects our token.
+  static VoidCallback? onUnauthorized;
+
+  /// Test hook.
+  @visibleForTesting
+  static set client(http.Client c) => _client = c;
+
+  /// Endpoints where a 401 means "wrong credentials", not "session expired".
+  static const _publicPaths = {
+    '/login',
+    '/signup',
+    '/forgot-password',
+    '/reset-password',
+    '/verify-email',
+    '/resend-verification',
+    '/change-password',
+  };
+
+  static Uri _uri(String path) {
+    assert(path.startsWith('/'), 'API paths must start with "/"');
+    return Uri.parse('${AppConfig.apiBaseUrl}$path');
+  }
+
+  static Future<Map<String, String>> _headers({bool json = true}) async {
     final token = await StorageService.getToken();
     return {
-      'Content-Type': 'application/json',
+      if (json) 'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'X-Client': 'mcri-app',
       if (token != null) 'Authorization': 'Bearer $token',
     };
   }
 
-  static dynamic _handleResponse(http.Response response) {
-    final decoded = response.body.isEmpty ? null : jsonDecode(response.body);
+  static Future<dynamic> _send(
+    String method,
+    String path, {
+    Object? body,
+    bool retry = false,
+  }) async {
+    final hadToken = StorageService.cachedToken != null;
+    http.Response response;
+    try {
+      response = await _attempt(method, path, body);
+    } on ApiException catch (e) {
+      if (!retry || !e.isNetwork) rethrow;
+      await Future<void>.delayed(const Duration(milliseconds: 600));
+      response = await _attempt(method, path, body);
+    }
 
+    if (response.statusCode == 401 &&
+        hadToken &&
+        !_publicPaths.contains(path.split('?').first)) {
+      onUnauthorized?.call();
+    }
+    return _handleResponse(response);
+  }
+
+  static Future<http.Response> _attempt(
+    String method,
+    String path,
+    Object? body,
+  ) async {
+    final request = http.Request(method, _uri(path))
+      ..headers.addAll(await _headers(json: body != null));
+    if (body != null) request.body = jsonEncode(body);
+    try {
+      final streamed = await _client
+          .send(request)
+          .timeout(AppConfig.requestTimeout);
+      return await http.Response.fromStream(streamed)
+          .timeout(AppConfig.requestTimeout);
+    } on TimeoutException {
+      throw ApiException(
+        0,
+        'The server took too long to respond. Please try again.',
+      );
+    } on SocketException {
+      throw ApiException(
+        0,
+        'No internet connection. Check your network and try again.',
+      );
+    } on http.ClientException {
+      throw ApiException(0, 'Could not reach the server. Please try again.');
+    } on HandshakeException {
+      throw ApiException(0, 'Secure connection failed.');
+    }
+  }
+
+  static dynamic _decode(String body) {
+    if (body.isEmpty) return null;
+    try {
+      return jsonDecode(body);
+    } on FormatException {
+      return null;
+    }
+  }
+
+  static dynamic _handleResponse(http.Response response) {
+    final decoded = _decode(response.body);
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return decoded;
     }
-
     throw ApiException(
       response.statusCode,
       _extractMessage(decoded, response.statusCode),
     );
   }
 
+  /// Pulls a human message out of the many error shapes the API returns
+  /// (plain {message}, {error: "..."} , Zod issue arrays, Zod JSON-in-a-string).
   static String _extractMessage(dynamic decoded, int statusCode) {
-    // Direct Zod array:
-    // [
-    //   {
-    //     "message": "Invalid email address"
-    //   }
-    // ]
-    if (decoded is List && decoded.isNotEmpty) {
-      final first = decoded.first;
-
-      if (first is Map && first['message'] is String) {
-        return first['message'] as String;
+    String? firstMessage(dynamic v) {
+      if (v is List &&
+          v.isNotEmpty &&
+          v.first is Map &&
+          v.first['message'] is String) {
+        return v.first['message'] as String;
       }
-    }
-
-    if (decoded is! Map) {
-      return 'Something went wrong';
-    }
-
-    // Direct message:
-    // { "message": "Invalid email address" }
-    if (decoded['message'] is String) {
-      return decoded['message'] as String;
-    }
-
-    final error = decoded['error'];
-
-    // error is already a message
-    if (error is String) {
-      // Sometimes the backend puts the Zod JSON inside the error string.
-      try {
-        final parsedError = jsonDecode(error);
-
-        if (parsedError is List && parsedError.isNotEmpty) {
-          final first = parsedError.first;
-
-          if (first is Map && first['message'] is String) {
-            return first['message'] as String;
-          }
-        }
-
-        if (parsedError is Map) {
-          if (parsedError['message'] is String) {
-            return parsedError['message'] as String;
-          }
-
-          final issues = parsedError['issues'];
-
-          if (issues is List && issues.isNotEmpty) {
-            final first = issues.first;
-
-            if (first is Map && first['message'] is String) {
-              return first['message'] as String;
-            }
-          }
-        }
-      } catch (_) {
-        // It wasn't JSON, so use the string directly.
+      if (v is Map) {
+        if (v['message'] is String) return v['message'] as String;
+        final issues = firstMessage(v['issues']);
+        if (issues != null) return issues;
       }
-
-      return error;
+      return null;
     }
 
-    // error is an object
-    if (error is Map) {
-      if (error['message'] is String) {
-        return error['message'] as String;
-      }
+    final direct = firstMessage(decoded);
+    if (direct != null) return direct;
 
-      final issues = error['issues'];
-
-      if (issues is List && issues.isNotEmpty) {
-        final first = issues.first;
-
-        if (first is Map && first['message'] is String) {
-          return first['message'] as String;
+    if (decoded is Map) {
+      final error = decoded['error'];
+      if (error is String) {
+        try {
+          return firstMessage(jsonDecode(error)) ?? error;
+        } on FormatException {
+          return error;
         }
       }
+      final nested = firstMessage(error);
+      if (nested != null) return nested;
     }
 
-    // Top-level Zod issues
-    final issues = decoded['issues'];
-
-    if (issues is List && issues.isNotEmpty) {
-      final first = issues.first;
-
-      if (first is Map && first['message'] is String) {
-        return first['message'] as String;
-      }
-    }
-
-    return 'Something went wrong';
+    return switch (statusCode) {
+      401 => 'Your session has expired. Please sign in again.',
+      403 => "You don't have permission to do that.",
+      404 => 'Not found.',
+      429 => 'Too many attempts. Please wait a moment and try again.',
+      >= 500 =>
+        'The server is having trouble right now. Please try again shortly.',
+      _ => 'Something went wrong',
+    };
   }
 
-  static Future<dynamic> patch(String path, Map<String, dynamic> body) async {
-    final uri = Uri.parse('${ApiConstants.baseUrl}$path');
-    final response = await http.patch(
-      uri,
-      headers: await _headers(),
-      body: jsonEncode(body),
-    );
-    return _handleResponse(response);
-  }
+  static Future<dynamic> get(String path) => _send('GET', path, retry: true);
 
-  static Future<dynamic> get(String path) async {
-    final uri = Uri.parse('${ApiConstants.baseUrl}$path');
-    final response = await http.get(uri, headers: await _headers());
-    return _handleResponse(response);
-  }
+  static Future<dynamic> post(String path, [dynamic body = const {}]) =>
+      _send('POST', path, body: body);
 
-  static Future<dynamic> delete(String path) async {
-    final uri = Uri.parse('${ApiConstants.baseUrl}$path');
-    final response = await http.delete(uri, headers: await _headers());
-    return _handleResponse(response);
-  }
+  static Future<dynamic> patch(String path, Map<String, dynamic> body) =>
+      _send('PATCH', path, body: body);
 
-  static Future<dynamic> post(String path, dynamic body) async {
-    final uri = Uri.parse('${ApiConstants.baseUrl}$path');
-    final response = await http.post(
-      uri,
-      headers: await _headers(),
-      body: jsonEncode(body),
-    );
-    return _handleResponse(response);
-  }
+  static Future<dynamic> put(String path, Map<String, dynamic> body) =>
+      _send('PUT', path, body: body);
+
+  static Future<dynamic> delete(String path) => _send('DELETE', path);
 }

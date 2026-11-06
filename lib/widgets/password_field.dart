@@ -1,3 +1,4 @@
+import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 
 import 'input_style.dart';
@@ -18,7 +19,7 @@ const _strengthColors = [
   Color(0xFFF87171),
   Color(0xFFFBBF24),
   Color(0xFF34D399),
-  Color(0xFF10B981),
+  AppColors.success,
 ];
 
 class AppPasswordField extends StatefulWidget {
@@ -109,7 +110,7 @@ class _AppPasswordFieldState extends State<AppPasswordField> {
             onChanged: widget.onChanged,
             onSubmitted: widget.onSubmitted,
             cursorColor: kFieldAccent,
-            style: const TextStyle(fontSize: 14.5, color: Color(0xFF0A0A0A)),
+            style: const TextStyle(fontSize: 14.5, color: AppColors.ink),
             decoration: appFieldDecoration(
               hint: widget.hint,
               icon: Icons.lock_outline,
@@ -146,7 +147,7 @@ class _AppPasswordFieldState extends State<AppPasswordField> {
                     decoration: BoxDecoration(
                       color: filled
                           ? _strengthColors[strength]
-                          : const Color(0xFFE5E7EB),
+                          : AppColors.border,
                       borderRadius: BorderRadius.circular(999),
                     ),
                   ),
@@ -162,9 +163,7 @@ class _AppPasswordFieldState extends State<AppPasswordField> {
               style: TextStyle(
                 fontSize: 11.5,
                 fontWeight: FontWeight.w600,
-                color: strength <= 1
-                    ? const Color(0xFFEF4444)
-                    : const Color(0xFF6B7280),
+                color: strength <= 1 ? AppColors.danger : AppColors.muted,
               ),
             ),
           ),
@@ -211,7 +210,7 @@ class _RequirementRow extends StatelessWidget {
               met ? Icons.check_circle : Icons.circle_outlined,
               key: ValueKey(met),
               size: 14,
-              color: met ? const Color(0xFF10B981) : const Color(0xFFD1D5DB),
+              color: met ? AppColors.success : const Color(0xFFD1D5DB),
             ),
           ),
           const SizedBox(width: 6),
@@ -219,7 +218,7 @@ class _RequirementRow extends StatelessWidget {
             label,
             style: TextStyle(
               fontSize: 11.5,
-              color: met ? const Color(0xFF6B7280) : const Color(0xFF9CA3AF),
+              color: met ? AppColors.muted : AppColors.subtle,
             ),
           ),
         ],

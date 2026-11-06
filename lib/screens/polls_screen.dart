@@ -1,3 +1,4 @@
+import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -12,8 +13,8 @@ import '../services/api_service.dart';
 import '../utils/poll_export.dart';
 import '../utils/whatsapp_share.dart';
 
-const _red = Color(0xFFEF4444);
-const _green = Color(0xFF10B981);
+const _red = AppColors.danger;
+const _green = AppColors.success;
 
 class PollsScreen extends StatefulWidget {
   const PollsScreen({super.key});
@@ -264,7 +265,7 @@ class _OptionBar extends StatelessWidget {
               style: TextStyle(
                 fontSize: 13.5,
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
-                color: selected ? const Color(0xFF3355FF) : colors.onSurface,
+                color: selected ? AppColors.primary : colors.onSurface,
               ),
             ),
             Text(
@@ -282,7 +283,7 @@ class _OptionBar extends StatelessWidget {
             backgroundColor: colors.surfaceContainerHighest,
             valueColor: AlwaysStoppedAnimation(
               selected
-                  ? const Color(0xFF3355FF)
+                  ? AppColors.primary
                   : colors.onSurfaceVariant.withValues(alpha: 0.4),
             ),
           ),
@@ -433,11 +434,11 @@ class _VoteCardState extends State<_VoteCard> {
                         height: 20,
                         decoration: BoxDecoration(
                           color: _draft.contains(opt.id)
-                              ? const Color(0xFF3355FF)
+                              ? AppColors.primary
                               : Colors.transparent,
                           border: Border.all(
                             color: _draft.contains(opt.id)
-                                ? const Color(0xFF3355FF)
+                                ? AppColors.primary
                                 : colors.outlineVariant,
                             width: 2,
                           ),
@@ -1039,7 +1040,7 @@ class _VotersSheetState extends State<_VotersSheet> {
                                                 : '?',
                                             style: const TextStyle(
                                               fontSize: 10,
-                                              color: Color(0xFF3355FF),
+                                              color: AppColors.primary,
                                               fontWeight: FontWeight.w700,
                                             ),
                                           ),
@@ -1627,7 +1628,7 @@ class _NewPollSheetState extends State<_NewPollSheet> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF3355FF)),
+        borderSide: const BorderSide(color: AppColors.primary),
       ),
     );
   }

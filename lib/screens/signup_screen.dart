@@ -1,3 +1,5 @@
+import 'package:mcri_residents_app/config/env.dart';
+import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -11,10 +13,10 @@ import '../widgets/password_field.dart';
 
 final _emailRegex = RegExp(r'^[^\s@]+@([^\s@.,]+\.)+[^\s@.,]{2,}$');
 
-const _ink = Color(0xFF0A0A0A);
-const _accent = Color(0xFF3355FF);
-const _sheet = Color(0xFFF7F6F3);
-const _muted = Color(0xFF6B7280);
+const _ink = AppColors.ink;
+const _accent = AppColors.primary;
+const _sheet = AppColors.canvas;
+const _muted = AppColors.muted;
 
 /// Per-field validation. Returns a map of field -> message (empty = valid).
 Map<String, String> _validate({
@@ -78,7 +80,7 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   Future<void> _handleGoogleLogin() async {
-    final uri = Uri.parse('https://api.mcriresidents.online/api/auth/google');
+    final uri = Uri.parse(AppConfig.googleAuthUrl);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
@@ -183,13 +185,13 @@ class _SignupScreenState extends State<SignupScreen> {
 
   Widget _buildHero(double height, double topInset) {
     return Container(
-      height: height,
+      constraints: BoxConstraints(minHeight: height),
       width: double.infinity,
       decoration: const BoxDecoration(
         gradient: RadialGradient(
           center: Alignment(0.9, -1.0),
           radius: 1.3,
-          colors: [Color(0xFF1C2B73), _ink],
+          colors: [AppColors.primaryDeep, _ink],
         ),
       ),
       child: Stack(
@@ -392,7 +394,10 @@ class _SignupScreenState extends State<SignupScreen> {
               ),
               child: Text(
                 _error!,
-                style: const TextStyle(color: Color(0xFFDC2626), fontSize: 13),
+                style: const TextStyle(
+                  color: AppColors.dangerDark,
+                  fontSize: 13,
+                ),
               ),
             ),
           ],
@@ -410,7 +415,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 padding: EdgeInsets.symmetric(horizontal: 12),
                 child: Text(
                   'or',
-                  style: TextStyle(fontSize: 11.5, color: Color(0xFF9CA3AF)),
+                  style: TextStyle(fontSize: 11.5, color: AppColors.subtle),
                 ),
               ),
               Expanded(child: Divider()),
@@ -423,8 +428,9 @@ class _SignupScreenState extends State<SignupScreen> {
             isPrimary: false,
           ),
           const SizedBox(height: 28),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               const Text(
                 'Already have an account? ',

@@ -2,11 +2,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:local_auth/local_auth.dart';
 
-/// Biometric sign-in credentials, kept in their own secure store.
-///
-/// IMPORTANT: the storage options and key names below are identical to the
-/// ones in login_screen.dart, so both read and write the same data. If you
-/// change one, change the other.
+/// Biometric sign-in credentials, kept in their own secure store (own
+/// Android prefs file / iOS account) so a logout's deleteAll() on the main
+/// store never wipes them. This is the only place that touches them.
 class BiometricStore {
   BiometricStore._();
 
@@ -45,17 +43,33 @@ class BiometricStore {
   static Future<void> setDeclined() =>
       _storage.write(key: _kDeclined, value: 'true');
 
-  /// Asks the user for a fingerprint / face scan.
-  static Future<bool> confirm(String reason) async {
+  /// Enabled AND both credentials present.
+  static Future<bool> isUsable() async =>
+      await isEnabled() &&
+      await _storage.read(key: _kEmail) != null &&
+      await _storage.read(key: _kPassword) != null;
+
+  /// Returns (email, password) or null if either is missing.
+  static Future<({String email, String password})?> readCredentials() async {
+    final email = await _storage.read(key: _kEmail);
+    final password = await _storage.read(key: _kPassword);
+    if (email == null || password == null) return null;
+    return (email: email, password: password);
+  }
+
+  /// Asks the user for a fingerprint / face scan. Throws nothing.
+  static Future<bool> confirm(
+    String reason, {
+    bool persistAcrossBackgrounding = false,
+  }) async {
     try {
-      final ok = await _auth.authenticate(
+      return await _auth.authenticate(
         localizedReason: reason,
         biometricOnly: true,
+        persistAcrossBackgrounding: persistAcrossBackgrounding,
       );
-      debugPrint('[bio] confirm result=$ok');
-      return ok;
     } catch (e) {
-      debugPrint('[bio] confirm failed: $e');
+      if (kDebugMode) debugPrint('[bio] confirm failed: $e');
       return false;
     }
   }
@@ -65,7 +79,6 @@ class BiometricStore {
     await _storage.write(key: _kEmail, value: email);
     await _storage.write(key: _kPassword, value: password);
     await _storage.write(key: _kEnabled, value: 'true');
-    debugPrint('[bio] credentials saved (store)');
   }
 
   static Future<void> clear() async {

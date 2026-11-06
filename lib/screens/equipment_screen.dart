@@ -1,3 +1,4 @@
+import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -8,11 +9,11 @@ import '../models/equipment_request.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 
-const _red = Color(0xFFEF4444);
-const _accent = Color(0xFF3355FF);
-const _amber = Color(0xFFD97706);
-const _green = Color(0xFF10B981);
-const _orange = Color(0xFFEA580C);
+const _red = AppColors.danger;
+const _accent = AppColors.primary;
+const _amber = AppColors.warning;
+const _green = AppColors.success;
+const _orange = AppColors.primaryDark;
 const _caretakerRoleId = 4;
 
 enum _Tab { browse, requests, manage, issues }

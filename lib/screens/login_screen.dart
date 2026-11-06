@@ -1,12 +1,13 @@
+import 'package:mcri_residents_app/config/env.dart';
+import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:local_auth/local_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
+import '../services/biometric_store.dart';
 import '../widgets/app_button.dart';
 import '../widgets/app_text_field.dart';
 import '../widgets/password_field.dart';
@@ -15,16 +16,10 @@ import 'forgot_password_screen.dart';
 
 final _emailRegex = RegExp(r'^[^\s@]+@([^\s@.,]+\.)+[^\s@.,]{2,}$');
 
-const _ink = Color(0xFF0A0A0A);
-const _accent = Color(0xFF3355FF);
-const _sheet = Color(0xFFF7F6F3);
-const _muted = Color(0xFF6B7280);
-
-// Keys inside the dedicated biometric store
-const _kBioEnabled = 'bio_enabled';
-const _kBioDeclined = 'bio_declined';
-const _kBioEmail = 'bio_email';
-const _kBioPassword = 'bio_password';
+const _ink = AppColors.ink;
+const _accent = AppColors.primary;
+const _sheet = AppColors.canvas;
+const _muted = AppColors.muted;
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -36,18 +31,6 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-
-  // A separate store (own Android prefs file / iOS account name) so that a
-  // storage.deleteAll() in AuthProvider.logout() cannot wipe the biometric
-  // credentials.
-  final _storage = const FlutterSecureStorage(
-    aOptions: AndroidOptions(
-      sharedPreferencesName: 'mcri_biometric_store',
-      preferencesKeyPrefix: 'mcri_bio_',
-    ),
-    iOptions: IOSOptions(accountName: 'mcri_biometric_store'),
-  );
-  final _localAuth = LocalAuthentication();
 
   bool _submitting = false;
   String? _error;
@@ -79,22 +62,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _initBiometrics() async {
     try {
-      final supported = await _localAuth.isDeviceSupported();
-      final canCheck = await _localAuth.canCheckBiometrics;
-      final enabled = (await _storage.read(key: _kBioEnabled)) == 'true';
-      final email = await _storage.read(key: _kBioEmail);
-      final hasPassword = (await _storage.read(key: _kBioPassword)) != null;
-
-      debugPrint(
-        '[bio] supported=$supported canCheck=$canCheck '
-        'enabled=$enabled hasEmail=${email != null} '
-        'hasPassword=$hasPassword',
-      );
+      final available = await BiometricStore.isAvailable();
+      final usable = await BiometricStore.isUsable();
+      final email = await BiometricStore.savedEmail();
 
       if (!mounted) return;
-      final usable = enabled && email != null && hasPassword;
       setState(() {
-        _biometricAvailable = supported && canCheck;
+        _biometricAvailable = available;
         _biometricEnabled = usable;
         _savedEmail = email;
       });
@@ -105,47 +79,31 @@ class _LoginScreenState extends State<LoginScreen> {
         await Future<void>.delayed(const Duration(milliseconds: 450));
         if (mounted && _showBiometricView) _handleBiometricLogin();
       }
-    } catch (e) {
-      debugPrint('[bio] init failed: $e');
+    } catch (_) {
+      // Biometrics are optional; fall back to the password form.
     }
   }
 
   Future<void> _handleBiometricLogin() async {
     if (_submitting) return;
-    try {
-      final ok = await _localAuth.authenticate(
-        localizedReason: 'Sign in to your portal',
-        biometricOnly: true,
-        persistAcrossBackgrounding: true,
-      );
-      debugPrint('[bio] authenticate result=$ok');
-      if (!ok) return;
+    final ok = await BiometricStore.confirm(
+      'Sign in to your portal',
+      persistAcrossBackgrounding: true,
+    );
+    if (!ok) return;
 
-      final email = await _storage.read(key: _kBioEmail);
-      final password = await _storage.read(key: _kBioPassword);
-      if (email == null || password == null) {
-        await _clearBiometricCreds();
-        if (mounted) {
-          setState(() {
-            _biometricEnabled = false;
-            _error = 'Saved credentials not found. Please sign in again.';
-          });
-        }
-        return;
-      }
-      await _performLogin(email, password, fromBiometric: true);
-    } catch (e) {
-      debugPrint('[bio] authenticate failed: $e');
+    final creds = await BiometricStore.readCredentials();
+    if (creds == null) {
+      await BiometricStore.clear();
       if (mounted) {
-        setState(() => _error = 'Biometric authentication unavailable.');
+        setState(() {
+          _biometricEnabled = false;
+          _error = 'Saved credentials not found. Please sign in again.';
+        });
       }
+      return;
     }
-  }
-
-  Future<void> _clearBiometricCreds() async {
-    await _storage.delete(key: _kBioEmail);
-    await _storage.delete(key: _kBioPassword);
-    await _storage.write(key: _kBioEnabled, value: 'false');
+    await _performLogin(creds.email, creds.password, fromBiometric: true);
   }
 
   /// Asked BEFORE logging in: a successful login swaps this screen out
@@ -153,18 +111,16 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<bool> _askToEnableBiometric({required bool replacing}) async {
     if (!_biometricAvailable) return false;
     if (_biometricEnabled && !replacing) return false;
-    if ((await _storage.read(key: _kBioDeclined)) == 'true') return false;
+    if (await BiometricStore.isDeclined()) return false;
     if (!mounted) return false;
 
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           replacing
               ? 'Switch biometric sign-in to this account?'
               : 'Use biometrics next time?',
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
         ),
         content: const Text(
           'Sign in faster with your fingerprint or face. Your details are '
@@ -180,7 +136,6 @@ class _LoginScreenState extends State<LoginScreen> {
             child: const Text('Not now'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: _ink),
             onPressed: () => Navigator.pop(ctx, 'yes'),
             child: const Text('Enable'),
           ),
@@ -188,28 +143,15 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
 
-    if (result == 'never') {
-      await _storage.write(key: _kBioDeclined, value: 'true');
-    }
+    if (result == 'never') await BiometricStore.setDeclined();
     if (result != 'yes') return false;
-
-    try {
-      final ok = await _localAuth.authenticate(
-        localizedReason: 'Confirm to enable biometric sign-in',
-        biometricOnly: true,
-      );
-      debugPrint('[bio] enable-confirm result=$ok');
-      return ok;
-    } catch (e) {
-      debugPrint('[bio] enable-confirm failed: $e');
-      return false;
-    }
+    return BiometricStore.confirm('Confirm to enable biometric sign-in');
   }
 
   // ───────────────────────── Login ─────────────────────────
 
   Future<void> _handleGoogleLogin() async {
-    final uri = Uri.parse('https://api.mcriresidents.online/api/auth/google');
+    final uri = Uri.parse(AppConfig.googleAuthUrl);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
@@ -261,12 +203,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (saveBiometric) {
         try {
-          await _storage.write(key: _kBioEmail, value: email);
-          await _storage.write(key: _kBioPassword, value: password);
-          await _storage.write(key: _kBioEnabled, value: 'true');
-          debugPrint('[bio] credentials saved');
-        } catch (e) {
-          debugPrint('[bio] save failed: $e');
+          await BiometricStore.save(email, password);
+        } catch (_) {
+          // Non-fatal: the user is signed in, just without biometrics.
         }
       }
       // No navigation needed — main.dart swaps to MainShell automatically.
@@ -282,7 +221,7 @@ class _LoginScreenState extends State<LoginScreen> {
         });
         // Saved password is stale (changed elsewhere): drop it.
         if (fromBiometric && e.statusCode == 401) {
-          await _clearBiometricCreds();
+          await BiometricStore.clear();
           if (mounted) {
             setState(() {
               _biometricEnabled = false;
@@ -291,8 +230,7 @@ class _LoginScreenState extends State<LoginScreen> {
           }
         }
       }
-    } catch (e) {
-      debugPrint('[login] failed: $e');
+    } catch (_) {
       if (mounted) {
         setState(() => _error = 'Something went wrong. Please try again.');
       }
@@ -366,14 +304,14 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _buildHero(double height, double topInset) {
     final bio = _showBiometricView;
     return Container(
-      height: height,
+      constraints: BoxConstraints(minHeight: height),
       width: double.infinity,
       padding: EdgeInsets.only(top: topInset),
       decoration: const BoxDecoration(
         gradient: RadialGradient(
           center: Alignment(0.9, -1.0),
           radius: 1.3,
-          colors: [Color(0xFF1C2B73), _ink],
+          colors: [AppColors.primaryDeep, _ink],
         ),
       ),
       child: Column(
@@ -442,7 +380,7 @@ class _LoginScreenState extends State<LoginScreen> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: const Color(0xFFE5E7EB)),
+            border: Border.all(color: AppColors.border),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -603,7 +541,7 @@ class _LoginScreenState extends State<LoginScreen> {
         children: [
           Text(
             _error!,
-            style: const TextStyle(color: Color(0xFFDC2626), fontSize: 13),
+            style: const TextStyle(color: AppColors.dangerDark, fontSize: 13),
           ),
           if (_failedAttempt) ...[
             const SizedBox(height: 4),
@@ -616,7 +554,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFFDC2626),
+                  color: AppColors.dangerDark,
                   decoration: TextDecoration.underline,
                 ),
               ),
@@ -693,7 +631,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 style: OutlinedButton.styleFrom(
                   foregroundColor: _ink,
                   backgroundColor: Colors.white,
-                  side: const BorderSide(color: Color(0xFFE5E7EB)),
+                  side: const BorderSide(color: AppColors.border),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: const StadiumBorder(),
                 ),
@@ -708,7 +646,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 padding: EdgeInsets.symmetric(horizontal: 12),
                 child: Text(
                   'or',
-                  style: TextStyle(fontSize: 11.5, color: Color(0xFF9CA3AF)),
+                  style: TextStyle(fontSize: 11.5, color: AppColors.subtle),
                 ),
               ),
               Expanded(child: Divider()),
@@ -721,8 +659,9 @@ class _LoginScreenState extends State<LoginScreen> {
             isPrimary: false,
           ),
           const SizedBox(height: 28),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               const Text(
                 "Don't have an account yet? ",

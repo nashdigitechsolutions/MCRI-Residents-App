@@ -1,7 +1,9 @@
+import 'package:mcri_residents_app/config/env.dart';
+import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
-const _accent = Color(0xFF3355FF);
+const _accent = AppColors.primary;
 const _targetPath = '/admin/audit-logs';
 
 class AuditLogsWebViewScreen extends StatefulWidget {
@@ -35,7 +37,13 @@ class _AuditLogsWebViewScreenState extends State<AuditLogsWebViewScreen> {
             // to bounce back into this app — the website's own 1.2s
             // fallback timer then just continues normally, inside this
             // WebView, as if no app were installed at all.
-            if (uri != null && uri.scheme == 'mcriresidents') {
+            if (uri == null || uri.scheme == AppConfig.deepLinkScheme) {
+              return NavigationDecision.prevent;
+            }
+            // This WebView holds an admin session: never let it navigate
+            // the main frame off the official website (or onto plain http).
+            if (request.isMainFrame &&
+                (uri.scheme != 'https' || uri.host != AppConfig.webHost)) {
               return NavigationDecision.prevent;
             }
             return NavigationDecision.navigate;
@@ -48,21 +56,19 @@ class _AuditLogsWebViewScreenState extends State<AuditLogsWebViewScreen> {
             final uri = Uri.tryParse(url);
             if (!_navigatedToTarget &&
                 uri != null &&
-                uri.host == 'mcriresidents.online' &&
+                uri.host == AppConfig.webHost &&
                 uri.path != '/auth/callback' &&
                 uri.path != _targetPath) {
               _navigatedToTarget = true;
               _controller.loadRequest(
-                Uri.https('mcriresidents.online', _targetPath),
+                Uri.https(AppConfig.webHost, _targetPath),
               );
             }
           },
         ),
       )
       ..loadRequest(
-        Uri.https('mcriresidents.online', '/auth/callback', {
-          'token': widget.token,
-        }),
+        Uri.https(AppConfig.webHost, '/auth/callback', {'token': widget.token}),
       );
   }
 
@@ -74,7 +80,7 @@ class _AuditLogsWebViewScreenState extends State<AuditLogsWebViewScreen> {
         actions: [
           IconButton(
             onPressed: () => _controller.loadRequest(
-              Uri.https('mcriresidents.online', _targetPath),
+              Uri.https(AppConfig.webHost, _targetPath),
             ),
             icon: const Icon(Icons.refresh),
             tooltip: 'Reload audit logs',

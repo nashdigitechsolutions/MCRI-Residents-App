@@ -1,3 +1,5 @@
+import 'package:mcri_residents_app/theme/app_theme.dart';
+
 import 'dart:convert';
 import 'dart:math';
 
@@ -100,17 +102,17 @@ class _SlidePuzzleCaptchaState extends State<SlidePuzzleCaptcha> {
     final trackColor = switch (_status) {
       _CaptchaStatus.success => const Color(0xFFECFDF5),
       _CaptchaStatus.fail => const Color(0xFFFEF2F2),
-      _CaptchaStatus.idle => const Color(0xFFF3F4F6),
+      _CaptchaStatus.idle => AppColors.fieldDisabled,
     };
     final borderColor = switch (_status) {
       _CaptchaStatus.success => const Color(0xFFA7F3D0),
       _CaptchaStatus.fail => const Color(0xFFFECACA),
-      _CaptchaStatus.idle => const Color(0xFFE5E7EB),
+      _CaptchaStatus.idle => AppColors.border,
     };
     final thumbColor = switch (_status) {
-      _CaptchaStatus.success => const Color(0xFF10B981),
-      _CaptchaStatus.fail => const Color(0xFFEF4444),
-      _CaptchaStatus.idle => const Color(0xFF0A0A0A),
+      _CaptchaStatus.success => AppColors.success,
+      _CaptchaStatus.fail => AppColors.danger,
+      _CaptchaStatus.idle => AppColors.ink,
     };
 
     return Column(
@@ -118,7 +120,7 @@ class _SlidePuzzleCaptchaState extends State<SlidePuzzleCaptcha> {
       children: [
         const Text(
           'Drag the slider to line up with the marker',
-          style: TextStyle(fontSize: 11.5, color: Color(0xFF9CA3AF)),
+          style: TextStyle(fontSize: 11.5, color: AppColors.subtle),
         ),
         const SizedBox(height: 8),
         Container(
@@ -143,7 +145,7 @@ class _SlidePuzzleCaptchaState extends State<SlidePuzzleCaptcha> {
                     border: Border.all(
                       color: _status == _CaptchaStatus.success
                           ? const Color(0xFF34D399)
-                          : const Color(0xFF9CA3AF),
+                          : AppColors.subtle,
                       width: 2,
                     ),
                   ),
@@ -156,7 +158,7 @@ class _SlidePuzzleCaptchaState extends State<SlidePuzzleCaptcha> {
                 decoration: BoxDecoration(
                   color: _status == _CaptchaStatus.success
                       ? const Color(0xFFA7F3D0)
-                      : const Color(0xFF3355FF).withValues(alpha: 0.12),
+                      : AppColors.primary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
@@ -198,22 +200,26 @@ class _SlidePuzzleCaptchaState extends State<SlidePuzzleCaptcha> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              switch (_status) {
-                _CaptchaStatus.success => 'Verified — thanks!',
-                _CaptchaStatus.fail => 'Not quite — try again',
-                _CaptchaStatus.idle => 'Slide and release on the marker',
-              },
-              style: TextStyle(
-                fontSize: 11.5,
-                fontWeight: _status == _CaptchaStatus.idle
-                    ? FontWeight.normal
-                    : FontWeight.w600,
-                color: switch (_status) {
-                  _CaptchaStatus.success => const Color(0xFF059669),
-                  _CaptchaStatus.fail => const Color(0xFFEF4444),
-                  _CaptchaStatus.idle => const Color(0xFF9CA3AF),
+            Expanded(
+              child: Text(
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                switch (_status) {
+                  _CaptchaStatus.success => 'Verified — thanks!',
+                  _CaptchaStatus.fail => 'Not quite — try again',
+                  _CaptchaStatus.idle => 'Slide and release on the marker',
                 },
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: _status == _CaptchaStatus.idle
+                      ? FontWeight.normal
+                      : FontWeight.w600,
+                  color: switch (_status) {
+                    _CaptchaStatus.success => const Color(0xFF059669),
+                    _CaptchaStatus.fail => AppColors.danger,
+                    _CaptchaStatus.idle => AppColors.subtle,
+                  },
+                ),
               ),
             ),
             if (_status != _CaptchaStatus.success)
@@ -222,7 +228,7 @@ class _SlidePuzzleCaptchaState extends State<SlidePuzzleCaptcha> {
                 icon: const Icon(
                   Icons.refresh,
                   size: 15,
-                  color: Color(0xFF9CA3AF),
+                  color: AppColors.subtle,
                 ),
                 visualDensity: VisualDensity.compact,
                 padding: EdgeInsets.zero,

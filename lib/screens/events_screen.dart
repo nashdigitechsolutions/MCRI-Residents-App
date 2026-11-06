@@ -1,3 +1,4 @@
+import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:mcri_residents_app/models/attendance_status.dart';
@@ -9,8 +10,8 @@ import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../utils/google_calendar.dart';
 
-const _red = Color(0xFFEF4444);
-const _accent = Color(0xFF3355FF);
+const _red = AppColors.danger;
+const _accent = AppColors.primary;
 
 const _statusLabels = {
   'going': 'Going',
@@ -285,19 +286,29 @@ class _EventsScreenState extends State<EventsScreen> {
                       // AnimatedSwitcher: whenever the child widget's key changes,
                       // the old one fades out while the new one fades in — a tiny,
                       // low-level animation with no manual controller needed.
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 200),
-                        child: Text(
-                          DateFormat.yMMMM().format(_month),
-                          key: ValueKey(_month),
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: colors.onSurface,
+                      Expanded(
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 200),
+                              child: Text(
+                                DateFormat.yMMMM().format(_month),
+                                key: ValueKey(_month),
+                                maxLines: 1,
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: colors.onSurface,
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                       ),
                       Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           IconButton(
                             onPressed: () => setState(
