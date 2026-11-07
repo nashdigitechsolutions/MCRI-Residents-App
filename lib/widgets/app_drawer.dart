@@ -45,15 +45,15 @@ class _AppDrawerState extends State<AppDrawer>
       ),
   ];
 
-  static final _adminItem = () {
-    final d = appDestinations.firstWhere((d) => d.adminOnly);
-    return _DrawerItem(
-      icon: d.icon,
-      label: d.label,
-      routeName: d.routeName,
-      screenBuilder: d.builder,
-    );
-  }();
+  static final _adminItems = [
+    for (final d in appDestinations.where((d) => d.adminOnly))
+      _DrawerItem(
+        icon: d.icon,
+        label: d.label,
+        routeName: d.routeName,
+        screenBuilder: d.builder,
+      ),
+  ];
 
   @override
   void initState() {
@@ -122,7 +122,8 @@ class _AppDrawerState extends State<AppDrawer>
     final isAdmin = auth.user?.roleId == 1;
     final currentRoute = ModalRoute.of(context)?.settings.name;
 
-    final totalItems = _items.length + (isAdmin ? 1 : 0) + 1; // +1 for logout
+    final totalItems =
+        _items.length + (isAdmin ? _adminItems.length : 0) + 1; // +1 for logout
 
     return Drawer(
       backgroundColor: colors.surface,
@@ -183,14 +184,18 @@ class _AppDrawerState extends State<AppDrawer>
                           ),
                         ),
                       ),
-                      _AnimatedItem(
-                        animation: _itemAnim(_items.length + 2, totalItems),
-                        child: _DrawerRow(
-                          item: _adminItem,
-                          selected: _adminItem.routeName == currentRoute,
-                          onTap: () => _open(context, _adminItem),
+                      for (var a = 0; a < _adminItems.length; a++)
+                        _AnimatedItem(
+                          animation: _itemAnim(
+                            _items.length + 2 + a,
+                            totalItems,
+                          ),
+                          child: _DrawerRow(
+                            item: _adminItems[a],
+                            selected: _adminItems[a].routeName == currentRoute,
+                            onTap: () => _open(context, _adminItems[a]),
+                          ),
                         ),
-                      ),
                     ],
                   ],
                 ),

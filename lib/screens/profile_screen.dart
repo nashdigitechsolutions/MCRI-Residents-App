@@ -1,3 +1,9 @@
+import 'package:intl/intl.dart';
+
+import '../widgets/ui.dart';
+import '../navigation/app_navigator.dart';
+
+import 'package:url_launcher/url_launcher.dart';
 import 'package:mcri_residents_app/widgets/app_loader.dart';
 import 'package:mcri_residents_app/theme/app_theme.dart';
 
@@ -19,7 +25,6 @@ import '../services/storage_service.dart';
 import '../utils/initials.dart';
 
 const _red = AppColors.danger;
-const _green = AppColors.success;
 const _currentYear = 2026; // update yearly, or compute via DateTime.now().year
 const _minYear = 1900;
 const _maxYear = 2100;
@@ -116,6 +121,92 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (ok == true) _notify('Password updated');
   }
 
+  bool _savingAvailability = false;
+
+  Future<void> _setAvailable(bool next) async {
+    final previous = _form;
+    setState(() {
+      _form = _form.copy()..isAvailable = next;
+      _savingAvailability = true;
+    });
+    try {
+      await ApiService.patch('/set-profile', {
+        'user_id': context.read<AuthProvider>().user?.userId,
+        'is_available': next,
+      });
+      await _saveCache(_form);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _form = previous);
+        _notify('Could not update availability', isError: true);
+      }
+    } finally {
+      if (mounted) setState(() => _savingAvailability = false);
+    }
+  }
+
+  Future<void> _confirmLogout() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Log out?'),
+        content: const Text('You\'ll need to sign in again on this device.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.dangerDark,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Log out'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true && mounted) await context.read<AuthProvider>().logout();
+  }
+
+  /// Share of the profile filled in, for the "profile strength" meter.
+  ({int done, int total, String? next}) get _completeness {
+    final checks = <(bool, String)>[
+      (
+        _form.firstName.isNotEmpty && _form.lastName.isNotEmpty,
+        'your full name',
+      ),
+      (_form.phone.isNotEmpty, 'a phone number'),
+      (_form.bio.isNotEmpty, 'a short bio'),
+      (_form.dateOfBirth.isNotEmpty, 'your date of birth'),
+      (_form.gender.isNotEmpty, 'your gender'),
+      (
+        _form.emergencyContactName.isNotEmpty &&
+            _form.emergencyContactPhone.isNotEmpty,
+        'an emergency contact',
+      ),
+      (!_form.isStudent || _form.cohort.isNotEmpty, 'your cohort'),
+    ];
+    final missing = checks.where((c) => !c.$1).map((c) => c.$2);
+    return (
+      done: checks.length - missing.length,
+      total: checks.length,
+      next: missing.firstOrNull,
+    );
+  }
+
+  static String _roleLabel(int? roleId) => switch (roleId) {
+    1 => 'Admin',
+    2 => 'Resident',
+    4 => 'Caretaker',
+    _ => 'Member',
+  };
+
+  String _prettyDate(String raw) {
+    final d = DateTime.tryParse(raw);
+    return d == null ? raw : DateFormat('d MMMM yyyy').format(d);
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
@@ -128,307 +219,571 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final displayName = fullName.isNotEmpty
         ? fullName
         : (user?.username ?? 'Resident');
+    final c = _completeness;
+
+    Widget section(String title, List<_Line> lines) {
+      final shown = lines.where((l) => l.value.isNotEmpty).toList();
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(left: 4, bottom: 8),
+              child: Eyebrow(title),
+            ),
+            Material(
+              color: colors.surface,
+              clipBehavior: Clip.antiAlias,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                side: BorderSide(color: colors.outlineVariant),
+              ),
+              child: shown.isEmpty
+                  ? ListTile(
+                      leading: Icon(
+                        Icons.add_circle_outline_rounded,
+                        color: colors.onSurfaceVariant,
+                      ),
+                      title: Text(
+                        'Add details',
+                        style: TextStyle(color: colors.onSurfaceVariant),
+                      ),
+                      onTap: _openEditSheet,
+                    )
+                  : Column(
+                      children: [
+                        for (var i = 0; i < shown.length; i++) ...[
+                          if (i > 0)
+                            Divider(
+                              height: 1,
+                              indent: 56,
+                              color: colors.outlineVariant,
+                            ),
+                          ListTile(
+                            leading: Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: colors.primaryContainer,
+                                borderRadius: BorderRadius.circular(
+                                  AppRadius.sm,
+                                ),
+                              ),
+                              child: Icon(
+                                shown[i].icon,
+                                size: 17,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                            title: Text(
+                              shown[i].label,
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                color: colors.onSurfaceVariant,
+                              ),
+                            ),
+                            subtitle: Text(
+                              shown[i].value,
+                              style: TextStyle(
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.w600,
+                                color: colors.onSurface,
+                                height: 1.3,
+                              ),
+                            ),
+                            trailing: shown[i].uri == null
+                                ? null
+                                : Icon(
+                                    Icons.call_outlined,
+                                    size: 18,
+                                    color: AppColors.primary,
+                                  ),
+                            onTap: shown[i].uri == null
+                                ? null
+                                : () => launchUrl(shown[i].uri!),
+                          ),
+                        ],
+                      ],
+                    ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return Scaffold(
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // --- identity card ---
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: colors.surface,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: colors.outlineVariant),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                CircleAvatar(
-                  radius: 32,
-                  backgroundColor: AppColors.primary,
-                  child: Text(
-                    initialsFor(displayName),
+      body: RefreshIndicator(
+        onRefresh: _loadFromServer,
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            // ── Hero ───────────────────────────────────────────────
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppColors.ink,
+                    Color(0xFF2A160B),
+                    AppColors.primaryDeep,
+                  ],
+                ),
+                borderRadius: BorderRadius.vertical(
+                  bottom: Radius.circular(28),
+                ),
+              ),
+              child: Column(
+                children: [
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: SweepGradient(
+                            colors: [
+                              AppColors.primary,
+                              AppColors.primaryBorder,
+                              AppColors.primary,
+                            ],
+                          ),
+                        ),
+                        child: CircleAvatar(
+                          radius: 44,
+                          backgroundColor: AppColors.ink,
+                          child: Text(
+                            initialsFor(displayName),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 30,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        right: 2,
+                        bottom: 2,
+                        child: Container(
+                          width: 22,
+                          height: 22,
+                          decoration: BoxDecoration(
+                            color: _form.isAvailable
+                                ? AppColors.success
+                                : AppColors.subtle,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: AppColors.ink, width: 3),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    displayName,
+                    textAlign: TextAlign.center,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 22,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.3,
                     ),
                   ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  const SizedBox(height: 4),
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    runSpacing: 6,
                     children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              displayName,
-                              style: TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.bold,
-                                color: colors.onSurface,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                      if ((user?.username ?? '').isNotEmpty)
+                        Text(
+                          '@${user!.username}',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 13,
                           ),
-                          if (_form.isAvailable) ...[
-                            const SizedBox(width: 8),
-                            Container(
+                        ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.22),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: AppColors.primary.withValues(alpha: 0.5),
+                          ),
+                        ),
+                        child: Text(
+                          _roleLabel(user?.roleId),
+                          style: const TextStyle(
+                            color: AppColors.primaryBorder,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if ((user?.email ?? '').isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      user!.email,
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 12.5,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: _openEditSheet,
+                          icon: const Icon(Icons.edit_rounded, size: 17),
+                          label: const Text('Edit profile'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Material(
+                          color: Colors.white.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(AppRadius.sm + 2),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(
+                              AppRadius.sm + 2,
+                            ),
+                            onTap: _savingAvailability
+                                ? null
+                                : () => _setAvailable(!_form.isAvailable),
+                            child: Container(
+                              height: 48,
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 3,
+                                horizontal: 10,
                               ),
                               decoration: BoxDecoration(
-                                color: _green.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(999),
+                                borderRadius: BorderRadius.circular(
+                                  AppRadius.sm + 2,
+                                ),
+                                border: Border.all(color: Colors.white24),
                               ),
-                              child: const Row(
-                                mainAxisSize: MainAxisSize.min,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.circle, size: 6, color: _green),
-                                  SizedBox(width: 4),
-                                  Text(
-                                    'Available',
-                                    style: TextStyle(
-                                      fontSize: 10.5,
-                                      fontWeight: FontWeight.w700,
-                                      color: _green,
+                                  _savingAvailability
+                                      ? const SizedBox(
+                                          width: 14,
+                                          height: 14,
+                                          child: AppLoader(color: Colors.white),
+                                        )
+                                      : Icon(
+                                          Icons.circle,
+                                          size: 10,
+                                          color: _form.isAvailable
+                                              ? AppColors.success
+                                              : AppColors.subtle,
+                                        ),
+                                  const SizedBox(width: 8),
+                                  Flexible(
+                                    child: Text(
+                                      _form.isAvailable
+                                          ? 'Around the house'
+                                          : 'Away',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
                                   ),
                                 ],
                               ),
                             ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 18, 16, 32),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // ── Profile strength ─────────────────────────────
+                  if (c.done < c.total)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: colors.primaryContainer,
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                        border: Border.all(
+                          color: AppColors.primary.withValues(alpha: 0.35),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'Profile ${((c.done / c.total) * 100).round()}% complete',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    color: colors.onPrimaryContainer,
+                                  ),
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: _openEditSheet,
+                                child: const Text('Complete'),
+                              ),
+                            ],
+                          ),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(999),
+                            child: LinearProgressIndicator(
+                              value: c.done / c.total,
+                              minHeight: 6,
+                              backgroundColor: colors.surface,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          if (c.next != null) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              'Next: add ${c.next}.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: colors.onPrimaryContainer,
+                              ),
+                            ),
                           ],
                         ],
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        user?.email ?? '',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: colors.onSurfaceVariant,
+                    ),
+
+                  // ── At a glance ─────────────────────────────────
+                  Row(
+                    children: [
+                      for (final (label, value, icon) in [
+                        (
+                          'Status',
+                          _form.isStudent ? 'Student' : 'Staff',
+                          Icons.school_outlined,
                         ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      if (_form.bio.isNotEmpty) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          _form.bio,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: colors.onSurface,
+                        (
+                          'Year',
+                          _form.yearOfStudy.isNotEmpty
+                              ? _form.yearOfStudy
+                              : '—',
+                          Icons.timeline_rounded,
+                        ),
+                        (
+                          'Cohort',
+                          _form.cohort.isNotEmpty ? _form.cohort : '—',
+                          Icons.groups_outlined,
+                        ),
+                      ]) ...[
+                        if (label != 'Status') const SizedBox(width: 10),
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 14,
+                              horizontal: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: colors.surface,
+                              borderRadius: BorderRadius.circular(AppRadius.md),
+                              border: Border.all(color: colors.outlineVariant),
+                            ),
+                            child: Column(
+                              children: [
+                                Icon(icon, size: 18, color: AppColors.primary),
+                                const SizedBox(height: 6),
+                                Text(
+                                  value,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w800,
+                                    color: colors.onSurface,
+                                  ),
+                                ),
+                                Text(
+                                  label,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: colors.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ],
                   ),
-                ),
-                IconButton(
-                  onPressed: _openEditSheet,
-                  icon: Icon(
-                    Icons.edit_outlined,
-                    size: 19,
-                    color: colors.onSurfaceVariant,
+                  const SizedBox(height: 18),
+
+                  section('About', [
+                    _Line(Icons.format_quote_rounded, 'Bio', _form.bio),
+                  ]),
+                  section('Contact', [
+                    _Line(
+                      Icons.phone_outlined,
+                      'Phone',
+                      _form.phone,
+                      _form.phone.isEmpty
+                          ? null
+                          : Uri(scheme: 'tel', path: _form.phone),
+                    ),
+                    _Line(
+                      Icons.mail_outline_rounded,
+                      'Email',
+                      user?.email ?? '',
+                    ),
+                  ]),
+                  section('Personal', [
+                    _Line(
+                      Icons.badge_outlined,
+                      'Full name',
+                      [
+                        _form.firstName,
+                        _form.middleName,
+                        _form.lastName,
+                      ].where((s) => s.isNotEmpty).join(' '),
+                    ),
+                    _Line(
+                      Icons.cake_outlined,
+                      'Date of birth',
+                      _form.dateOfBirth.isEmpty
+                          ? ''
+                          : _prettyDate(_form.dateOfBirth),
+                    ),
+                    _Line(Icons.wc_outlined, 'Gender', _form.gender),
+                  ]),
+                  section('Emergency contact', [
+                    _Line(
+                      Icons.contact_emergency_outlined,
+                      'Name',
+                      _form.emergencyContactName,
+                    ),
+                    _Line(
+                      Icons.phone_in_talk_outlined,
+                      'Phone',
+                      _form.emergencyContactPhone,
+                      _form.emergencyContactPhone.isEmpty
+                          ? null
+                          : Uri(
+                              scheme: 'tel',
+                              path: _form.emergencyContactPhone,
+                            ),
+                    ),
+                  ]),
+
+                  // ── Account ─────────────────────────────────────
+                  const Padding(
+                    padding: EdgeInsets.only(left: 4, bottom: 8),
+                    child: Eyebrow('Account'),
                   ),
-                  tooltip: 'Edit profile',
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 14),
-
-          // --- stat strip ---
-          Row(
-            children: [
-              Expanded(
-                child: _StatTile(
-                  value: _form.cohort.isNotEmpty ? _form.cohort : '—',
-                  label: 'Cohort',
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _StatTile(
-                  value: _form.yearOfStudy.isNotEmpty ? _form.yearOfStudy : '—',
-                  label: 'Year',
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _StatTile(
-                  value: _form.isStudent ? 'Student' : 'Staff',
-                  label: 'Status',
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 14),
-
-          // --- contact info ---
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: colors.surface,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: colors.outlineVariant),
-            ),
-            child: Column(
-              children: [
-                _InfoRow(label: 'Phone', value: _form.phone, colors: colors),
-                const SizedBox(height: 10),
-                _InfoRow(
-                  label: 'Emergency contact',
-                  value: _form.emergencyContactName,
-                  colors: colors,
-                ),
-                const SizedBox(height: 10),
-                _InfoRow(
-                  label: 'Date of birth',
-                  value: _form.dateOfBirth,
-                  colors: colors,
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 14),
-
-          // --- change password ---
-          Container(
-            decoration: BoxDecoration(
-              color: colors.surface,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: colors.outlineVariant),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: Material(
-              color: colors.surface,
-              child: ListTile(
-                onTap: _openChangePasswordSheet,
-                leading: Icon(
-                  Icons.key_outlined,
-                  size: 19,
-                  color: colors.onSurfaceVariant,
-                ),
-                title: Text(
-                  'Change password',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: colors.onSurface,
+                  Material(
+                    color: colors.surface,
+                    clipBehavior: Clip.antiAlias,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                      side: BorderSide(color: colors.outlineVariant),
+                    ),
+                    child: Column(
+                      children: [
+                        ListTile(
+                          leading: const Icon(
+                            Icons.lock_outline_rounded,
+                            color: AppColors.primary,
+                          ),
+                          title: const Text(
+                            'Change password',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          trailing: const Icon(Icons.chevron_right_rounded),
+                          onTap: _openChangePasswordSheet,
+                        ),
+                        Divider(
+                          height: 1,
+                          indent: 56,
+                          color: colors.outlineVariant,
+                        ),
+                        ListTile(
+                          leading: const Icon(
+                            Icons.settings_outlined,
+                            color: AppColors.primary,
+                          ),
+                          title: const Text(
+                            'Settings',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          trailing: const Icon(Icons.chevron_right_rounded),
+                          onTap: () => shellTab.value = ShellTab.settings,
+                        ),
+                        Divider(
+                          height: 1,
+                          indent: 56,
+                          color: colors.outlineVariant,
+                        ),
+                        ListTile(
+                          leading: const Icon(
+                            Icons.logout_rounded,
+                            color: AppColors.dangerDark,
+                          ),
+                          title: Text(
+                            auth.isImpersonating
+                                ? 'Return to admin'
+                                : 'Log out',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.dangerDark,
+                            ),
+                          ),
+                          onTap: auth.isImpersonating
+                              ? () => context
+                                    .read<AuthProvider>()
+                                    .endImpersonation()
+                              : _confirmLogout,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
+                ],
               ),
             ),
-          ),
-
-          const SizedBox(height: 16),
-
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () => context.read<AuthProvider>().logout(),
-              icon: const Icon(Icons.logout, color: _red, size: 18),
-              label: const Text('Log out', style: TextStyle(color: _red)),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Color(0xFFFECACA)),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
-class _StatTile extends StatelessWidget {
-  final String value;
-  final String label;
-
-  const _StatTile({required this.value, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colors.outlineVariant),
-      ),
-      child: Column(
-        children: [
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: colors.onSurface,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: TextStyle(fontSize: 10.5, color: colors.onSurfaceVariant),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _InfoRow extends StatelessWidget {
+/// One labelled detail on the profile (tappable when [uri] is set).
+class _Line {
+  final IconData icon;
   final String label;
   final String value;
-  final ColorScheme colors;
-
-  const _InfoRow({
-    required this.label,
-    required this.value,
-    required this.colors,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Flexible(
-          child: Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 13, color: colors.onSurfaceVariant),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Flexible(
-          child: Text(
-            value.isNotEmpty ? value : 'Not set',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: colors.onSurface,
-            ),
-            textAlign: TextAlign.right,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
-    );
-  }
+  final Uri? uri;
+  const _Line(this.icon, this.label, this.value, [this.uri]);
 }
 
 /// --- Edit profile sheet ---

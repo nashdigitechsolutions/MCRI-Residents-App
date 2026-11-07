@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../providers/auth_provider.dart';
 import '../providers/unread_provider.dart';
 import '../providers/websocket_provider.dart';
 import '../theme/app_theme.dart';
@@ -136,6 +137,7 @@ class _MainShellState extends State<MainShell> {
         drawer: const AppDrawer(),
         body: Column(
           children: [
+            const _ImpersonationBar(),
             _DelayedOfflineBanner(online: online),
             Expanded(
               child: IndexedStack(
@@ -282,6 +284,66 @@ class _BottomBar extends StatelessWidget {
                 ),
               );
             }),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Shown on every screen while an admin is using "Log in as…".
+class _ImpersonationBar extends StatelessWidget {
+  const _ImpersonationBar();
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+    if (!auth.isImpersonating) return const SizedBox.shrink();
+    final ends = auth.impersonationEndsAt;
+    final minsLeft = ends?.difference(DateTime.now()).inMinutes.clamp(0, 999);
+    return Material(
+      color: AppColors.ink,
+      child: SafeArea(
+        top: false,
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.switch_account_rounded,
+                size: 18,
+                color: AppColors.primary,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text.rich(
+                  TextSpan(
+                    children: [
+                      const TextSpan(text: 'Viewing as '),
+                      TextSpan(
+                        text: auth.user?.username ?? 'user',
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      if (minsLeft != null)
+                        TextSpan(text: ' · ${minsLeft}m left'),
+                    ],
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white, fontSize: 12.5),
+                ),
+              ),
+              TextButton(
+                onPressed: () =>
+                    context.read<AuthProvider>().endImpersonation(),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  visualDensity: VisualDensity.compact,
+                ),
+                child: const Text('Return to admin'),
+              ),
+            ],
           ),
         ),
       ),

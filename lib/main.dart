@@ -128,10 +128,23 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     });
   }
 
+  int? _lastUserId;
+
   void _onAuthChanged() {
     final loggedIn = _authProvider.isLoggedIn;
-    if (loggedIn == _wasLoggedIn) return; // ignore non-transition notifies
+    final userId = _authProvider.user?.userId;
+    // Same session, nothing to do. A different user while still signed in
+    // means "Log in as…" started or ended: reset everything account-bound.
+    if (loggedIn == _wasLoggedIn && (!loggedIn || userId == _lastUserId)) {
+      return;
+    }
+    if (loggedIn && _wasLoggedIn && userId != _lastUserId) {
+      _lastUserId = userId;
+      _switchAccount();
+      return;
+    }
     _wasLoggedIn = loggedIn;
+    _lastUserId = userId;
 
     if (loggedIn) {
       final settingsReady = _settingsProvider.loaded
@@ -145,6 +158,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       // "Push notifications: off" survives an app restart.
       settingsReady.then((_) async {
         if (!_authProvider.isLoggedIn) return;
+        // Never register this phone for someone else's pushes.
+        if (_authProvider.isImpersonating) return;
         if (!_settingsProvider.prefs.notificationsEnabled) {
           DeviceRegistrationService.unregister();
           return;
@@ -171,6 +186,29 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         );
       }
     }
+  }
+
+  /// Signed-in user changed without a sign-out (start/end of "Log in as…").
+  void _switchAccount() {
+    _webSocketProvider.disconnect();
+    ConversationDetailScreen.clearCache();
+    _unreadProvider.reset();
+    _settingsProvider.reset();
+    navigatorKey.currentState?.popUntil((r) => r.isFirst);
+    shellTab.value = ShellTab.home;
+    _settingsProvider.fetch();
+    final token = _authProvider.token;
+    if (token != null) _webSocketProvider.connect(token);
+    _unreadProvider.refresh();
+    scaffoldMessengerKey.currentState?.showSnackBar(
+      SnackBar(
+        content: Text(
+          _authProvider.isImpersonating
+              ? 'Now viewing the app as ${_authProvider.user?.username ?? 'this user'}'
+              : 'Back in your admin account',
+        ),
+      ),
+    );
   }
 
   void _onSocketChanged() {

@@ -48,7 +48,12 @@ class Conversation {
       final emoji = lastReactionEmoji ?? '👍';
       return who != null ? '$who reacted $emoji' : 'Reacted $emoji';
     }
-    final text = lastMessage ?? '';
+    var text = lastMessage ?? '';
+    // Forwarded messages carry a "↪ Forwarded\n" marker line.
+    const forwarded = '↪ Forwarded\n';
+    if (text.startsWith(forwarded)) {
+      text = '↪ ${text.substring(forwarded.length)}';
+    }
     return who != null ? '$who: $text' : text;
   }
 

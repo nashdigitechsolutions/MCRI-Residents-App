@@ -1,3 +1,4 @@
+import 'package:mcri_residents_app/widgets/text_prompt_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -105,32 +106,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  Future<String?> _askPassword() {
-    final controller = TextEditingController();
-    return showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Confirm your password'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          obscureText: true,
-          decoration: const InputDecoration(hintText: 'Password'),
-          onSubmitted: (v) => Navigator.pop(ctx, v),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, controller.text),
-            child: const Text('Continue'),
-          ),
-        ],
-      ),
-    ).whenComplete(controller.dispose);
-  }
+  Future<String?> _askPassword() => showTextPrompt(
+    context,
+    title: 'Confirm your password',
+    message: 'Needed once to set up fingerprint / face sign-in.',
+    hint: 'Password',
+    confirmLabel: 'Continue',
+    obscure: true,
+  );
 
   // ── Other actions ──────────────────────────────────────────────────────
   Future<void> _changePassword() async {

@@ -1,3 +1,4 @@
+import 'package:mcri_residents_app/widgets/text_prompt_dialog.dart';
 import 'package:mcri_residents_app/widgets/app_loader.dart';
 import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
@@ -229,32 +230,14 @@ class _EquipmentScreenState extends State<EquipmentScreen> with LiveRefresh {
     required String title,
     required String hint,
     required String confirm,
-  }) {
-    final controller = TextEditingController();
-    return showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(title),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          maxLines: 3,
-          maxLength: 300,
-          decoration: InputDecoration(hintText: hint),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-            child: Text(confirm),
-          ),
-        ],
-      ),
-    ).whenComplete(controller.dispose);
-  }
+  }) => showTextPrompt(
+    context,
+    title: title,
+    hint: hint,
+    confirmLabel: confirm,
+    maxLines: 3,
+    maxLength: 300,
+  );
 
   Future<void> _cancelRequest(EquipmentRequest req) async {
     try {

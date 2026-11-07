@@ -2,6 +2,7 @@ import 'package:mcri_residents_app/widgets/app_loader.dart';
 import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:mcri_residents_app/models/conversation.dart';
@@ -15,7 +16,9 @@ import '../providers/auth_provider.dart';
 import '../providers/unread_provider.dart';
 import '../providers/websocket_provider.dart';
 import '../services/api_service.dart';
+import '../utils/haptics.dart';
 import '../utils/linkify.dart';
+import '../widgets/forward_sheet.dart';
 import '../widgets/emoji_picker.dart';
 
 const _accent = AppColors.primary;
@@ -64,6 +67,12 @@ class _ConversationDetailScreenState extends State<ConversationDetailScreen>
   ChatMessage? _editingMsg;
   final _textController = TextEditingController();
   final _scrollController = ScrollController();
+
+  // ── Multi-select (long-press → Select), WhatsApp-style ──
+  final Set<int> _selectedIds = {};
+  bool get _selecting => _selectedIds.isNotEmpty;
+  List<ChatMessage> get _selectedMessages =>
+      _messages.where((m) => _selectedIds.contains(m.messageId)).toList();
 
   // ── In-chat search ──
   bool _searching = false;
@@ -737,6 +746,176 @@ class _ConversationDetailScreenState extends State<ConversationDetailScreen>
     );
   }
 
+  void _toggleSelected(ChatMessage msg) {
+    if (msg.isDeleted || msg.messageId <= 0) return;
+    AppHaptics.selection();
+    setState(() {
+      if (!_selectedIds.remove(msg.messageId)) _selectedIds.add(msg.messageId);
+    });
+  }
+
+  void _clearSelection() => setState(_selectedIds.clear);
+
+  String _plain(ChatMessage m) => stripForwarded(m.message ?? '');
+
+  /// One message: its text. Several: WhatsApp-style "[time] Name: text".
+  Future<void> _copy(List<ChatMessage> msgs) async {
+    if (msgs.isEmpty) return;
+    final myId = context.read<AuthProvider>().user?.userId;
+    final text = msgs.length == 1
+        ? _plain(msgs.first)
+        : msgs
+              .map((m) {
+                final who = m.senderId == myId
+                    ? 'You'
+                    : (_memberName(m.senderId) ?? 'Member');
+                final at = DateFormat('dd/MM HH:mm').format(m.createdAt);
+                return '[$at] $who: ${_plain(m)}';
+              })
+              .join('\n');
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) return;
+    _clearSelection();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          msgs.length == 1
+              ? 'Message copied'
+              : '${msgs.length} messages copied',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _forward(List<ChatMessage> msgs) async {
+    if (msgs.isEmpty) return;
+    final texts = msgs
+        .map((m) => m.message ?? '')
+        .where((t) => t.trim().isNotEmpty)
+        .toList();
+    final chats = await showForwardSheet(
+      context,
+      messages: texts,
+      excludeConversationId: widget.conversationId,
+    );
+    if (!mounted || chats == 0) return;
+    _clearSelection();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Forwarded to $chats chat${chats == 1 ? '' : 's'}'),
+      ),
+    );
+  }
+
+  /// Opens the message in a sheet where any part of it can be selected.
+  void _selectText(ChatMessage msg) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Select text',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _copy([msg]);
+                    },
+                    icon: const Icon(Icons.copy_rounded, size: 16),
+                    label: const Text('Copy all'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.sizeOf(ctx).height * 0.6,
+                ),
+                child: SingleChildScrollView(
+                  child: SelectableText(
+                    _plain(msg),
+                    style: const TextStyle(fontSize: 16, height: 1.45),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Press and drag to select, then tap Copy.',
+                style: Theme.of(ctx).textTheme.bodySmall,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  PreferredSizeWidget _buildSelectionBar(ColorScheme colors) {
+    final msgs = _selectedMessages;
+    final auth = context.read<AuthProvider>();
+    final myId = auth.user?.userId;
+    final canDelete =
+        msgs.isNotEmpty &&
+        msgs.every((m) => m.senderId == myId || auth.isAdmin);
+    return AppBar(
+      backgroundColor: colors.primaryContainer,
+      leading: IconButton(
+        icon: const Icon(Icons.close_rounded),
+        tooltip: 'Cancel',
+        onPressed: _clearSelection,
+      ),
+      title: Text('${msgs.length} selected'),
+      actions: [
+        if (msgs.length == 1)
+          IconButton(
+            tooltip: 'Reply',
+            icon: const Icon(Icons.reply_rounded),
+            onPressed: () {
+              final m = msgs.first;
+              _clearSelection();
+              _startReply(m);
+            },
+          ),
+        IconButton(
+          tooltip: 'Copy',
+          icon: const Icon(Icons.copy_rounded),
+          onPressed: () => _copy(msgs),
+        ),
+        IconButton(
+          tooltip: 'Forward',
+          icon: const Icon(Icons.shortcut_rounded),
+          onPressed: () => _forward(msgs),
+        ),
+        if (canDelete)
+          IconButton(
+            tooltip: 'Delete',
+            icon: const Icon(Icons.delete_outline_rounded, color: _red),
+            onPressed: () async {
+              final toDelete = List.of(msgs);
+              _clearSelection();
+              for (final m in toDelete) {
+                await _deleteMessage(m);
+              }
+            },
+          ),
+      ],
+    );
+  }
+
   void _openActionMenu(ChatMessage msg) {
     final myId = context.read<AuthProvider>().user?.userId;
     final mine = msg.senderId == myId;
@@ -792,6 +971,44 @@ class _ConversationDetailScreenState extends State<ConversationDetailScreen>
                   _startReply(msg);
                 },
               ),
+              if (!msg.isDeleted) ...[
+                ListTile(
+                  leading: const Icon(Icons.copy_rounded),
+                  title: const Text('Copy'),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _copy([msg]);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.text_fields_rounded),
+                  title: const Text('Select text'),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _selectText(msg);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.shortcut_rounded),
+                  title: const Text('Forward'),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _forward([msg]);
+                  },
+                ),
+                if (msg.messageId > 0)
+                  ListTile(
+                    leading: const Icon(Icons.check_circle_outline_rounded),
+                    title: const Text('Select'),
+                    subtitle: const Text(
+                      'Pick several messages to copy or forward',
+                    ),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      _toggleSelected(msg);
+                    },
+                  ),
+              ],
               if (mine && msg.messageId > 0)
                 ListTile(
                   leading: const Icon(Icons.edit_outlined),
@@ -945,397 +1162,442 @@ class _ConversationDetailScreenState extends State<ConversationDetailScreen>
     final headerName = _title ?? (_loading ? 'Loading…' : 'Conversation');
     final otherPhone = !_isGroup ? _otherMember?.phone : null;
 
-    return Scaffold(
-      appBar: _searching
-          ? _buildSearchBar(colors)
-          : AppBar(
-              titleSpacing: 0,
-              title: InkWell(
-                onTap: () {
-                  if (!_isGroup && _otherMember != null) {
-                    _openMemberSheet(_otherMember!);
-                  }
-                },
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 17,
-                      backgroundColor: _accent,
-                      child: Text(
-                        _isGroup ? 'G' : (_otherMember?.initials ?? 'C'),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
+    // Back leaves selection / search mode before leaving the chat.
+    return PopScope(
+      canPop: !_selecting && !_searching,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        if (_selecting) {
+          _clearSelection();
+        } else if (_searching) {
+          _toggleSearch();
+        }
+      },
+      child: Scaffold(
+        appBar: _selecting
+            ? _buildSelectionBar(colors)
+            : _searching
+            ? _buildSearchBar(colors)
+            : AppBar(
+                titleSpacing: 0,
+                title: InkWell(
+                  onTap: () {
+                    if (!_isGroup && _otherMember != null) {
+                      _openMemberSheet(_otherMember!);
+                    }
+                  },
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 17,
+                        backgroundColor: _accent,
+                        child: Text(
+                          _isGroup ? 'G' : (_otherMember?.initials ?? 'C'),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            headerName,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Text(
-                            _typingUserIds.isNotEmpty
-                                ? '${_typingUserIds.map((id) => _memberName(id)?.split(' ').first ?? '').join(', ')} typing…'
-                                : (_isGroup
-                                      ? '${_members.length} members'
-                                      : (_otherMember?.isAvailable == true
-                                            ? 'Available'
-                                            : 'Tap to view profile')),
-                            style: TextStyle(
-                              fontSize: 10.5,
-                              color: _typingUserIds.isNotEmpty
-                                  ? _accent
-                                  : colors.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                if (!_isGroup && otherPhone != null)
-                  IconButton(
-                    onPressed: () => _openWhatsApp(otherPhone),
-                    // Updated to use the FontAwesome WhatsApp icon
-                    icon: const FaIcon(
-                      FontAwesomeIcons.whatsapp,
-                      color: _whatsappGreen,
-                    ),
-                    tooltip: 'WhatsApp',
-                  ),
-                IconButton(
-                  onPressed: _toggleSearch,
-                  icon: const Icon(Icons.search_rounded),
-                  tooltip: 'Search in chat',
-                ),
-                IconButton(
-                  onPressed: () => setState(() => _showMembers = !_showMembers),
-                  icon: const Icon(Icons.people_outline),
-                ),
-              ],
-            ),
-      body: Column(
-        children: [
-          // Refreshing over cached messages: a small, non-blocking pill.
-          AnimatedSize(
-            duration: const Duration(milliseconds: 200),
-            child: _loading && _messages.isNotEmpty
-                ? Padding(
-                    padding: const EdgeInsets.only(top: 6),
-                    child: Center(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: colors.surface,
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(color: colors.outlineVariant),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const AppLoader(size: 14),
-                            const SizedBox(width: 6),
                             Text(
-                              'Updating…',
+                              headerName,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              _typingUserIds.isNotEmpty
+                                  ? '${_typingUserIds.map((id) => _memberName(id)?.split(' ').first ?? '').join(', ')} typing…'
+                                  : (_isGroup
+                                        ? '${_members.length} members'
+                                        : (_otherMember?.isAvailable == true
+                                              ? 'Available'
+                                              : 'Tap to view profile')),
                               style: TextStyle(
-                                fontSize: 11,
-                                color: colors.onSurfaceVariant,
+                                fontSize: 10.5,
+                                color: _typingUserIds.isNotEmpty
+                                    ? _accent
+                                    : colors.onSurfaceVariant,
                               ),
                             ),
                           ],
                         ),
                       ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  if (!_isGroup && otherPhone != null)
+                    IconButton(
+                      onPressed: () => _openWhatsApp(otherPhone),
+                      // Updated to use the FontAwesome WhatsApp icon
+                      icon: const FaIcon(
+                        FontAwesomeIcons.whatsapp,
+                        color: _whatsappGreen,
+                      ),
+                      tooltip: 'WhatsApp',
                     ),
-                  )
-                : const SizedBox(width: double.infinity),
-          ),
-          if (pinned.isNotEmpty)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              color: _accent.withValues(alpha: 0.06),
-              child: Row(
-                children: [
-                  const Icon(Icons.push_pin, size: 14, color: _accent),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Pinned${pinned.length > 1 ? ' · ${pinned.length}' : ''} — ${pinned.first.message}',
-                      style: const TextStyle(fontSize: 11.5, color: _accent),
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                  IconButton(
+                    onPressed: _toggleSearch,
+                    icon: const Icon(Icons.search_rounded),
+                    tooltip: 'Search in chat',
+                  ),
+                  IconButton(
+                    onPressed: () =>
+                        setState(() => _showMembers = !_showMembers),
+                    icon: const Icon(Icons.people_outline),
                   ),
                 ],
               ),
-            ),
-          if (_showMembers)
-            Container(
-              constraints: const BoxConstraints(maxHeight: 220),
-              decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(color: colors.outlineVariant),
-                ),
-              ),
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: _members.length,
-                itemBuilder: (context, i) {
-                  final m = _members[i];
-                  final isMe = m.userId == myId;
-                  return ListTile(
-                    dense: true,
-                    leading: CircleAvatar(
-                      radius: 15,
-                      backgroundColor: _accent,
-                      child: Text(
-                        m.initials,
-                        style: const TextStyle(
-                          fontSize: 10,
-                          color: Colors.white,
+        body: Column(
+          children: [
+            // Refreshing over cached messages: a small, non-blocking pill.
+            AnimatedSize(
+              duration: const Duration(milliseconds: 200),
+              child: _loading && _messages.isNotEmpty
+                  ? Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: colors.surface,
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(color: colors.outlineVariant),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const AppLoader(size: 14),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Updating…',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: colors.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                    title: Text(
-                      '${m.displayName}${isMe ? ' (you)' : ''}',
-                      style: const TextStyle(fontSize: 13),
-                    ),
-                    trailing: const Icon(Icons.chevron_right, size: 18),
-                    onTap: () => _openMemberSheet(m),
-                  );
-                },
-              ),
+                    )
+                  : const SizedBox(width: double.infinity),
             ),
-          Expanded(
-            child: _messages.isEmpty
-                ? (_loading
-                      ? const AppLoadingView(message: 'Loading messages…')
-                      : Center(
-                          child: Text(
-                            'No messages yet — say hello 👋',
-                            style: TextStyle(color: colors.onSurfaceVariant),
-                          ),
-                        ))
-                : ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 12,
+            if (pinned.isNotEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                color: _accent.withValues(alpha: 0.06),
+                child: Row(
+                  children: [
+                    const Icon(Icons.push_pin, size: 14, color: _accent),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Pinned${pinned.length > 1 ? ' · ${pinned.length}' : ''} — ${pinned.first.message}',
+                        style: const TextStyle(fontSize: 11.5, color: _accent),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                    itemCount: _messages.length,
-                    itemBuilder: (context, i) {
-                      final msg = _messages[i];
-                      final mine = msg.senderId == myId;
-                      final showDateHeader =
-                          i == 0 ||
-                          !_sameDay(_messages[i - 1].createdAt, msg.createdAt);
-                      final isLastOfMine = mine && i == _messages.length - 1;
+                  ],
+                ),
+              ),
+            if (_showMembers)
+              Container(
+                constraints: const BoxConstraints(maxHeight: 220),
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(color: colors.outlineVariant),
+                  ),
+                ),
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _members.length,
+                  itemBuilder: (context, i) {
+                    final m = _members[i];
+                    final isMe = m.userId == myId;
+                    return ListTile(
+                      dense: true,
+                      leading: CircleAvatar(
+                        radius: 15,
+                        backgroundColor: _accent,
+                        child: Text(
+                          m.initials,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                      title: Text(
+                        '${m.displayName}${isMe ? ' (you)' : ''}',
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                      trailing: const Icon(Icons.chevron_right, size: 18),
+                      onTap: () => _openMemberSheet(m),
+                    );
+                  },
+                ),
+              ),
+            Expanded(
+              child: _messages.isEmpty
+                  ? (_loading
+                        ? const AppLoadingView(message: 'Loading messages…')
+                        : Center(
+                            child: Text(
+                              'No messages yet — say hello 👋',
+                              style: TextStyle(color: colors.onSurfaceVariant),
+                            ),
+                          ))
+                  : ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 12,
+                      ),
+                      itemCount: _messages.length,
+                      itemBuilder: (context, i) {
+                        final msg = _messages[i];
+                        final mine = msg.senderId == myId;
+                        final showDateHeader =
+                            i == 0 ||
+                            !_sameDay(
+                              _messages[i - 1].createdAt,
+                              msg.createdAt,
+                            );
+                        final isLastOfMine = mine && i == _messages.length - 1;
 
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          if (showDateHeader)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              child: Center(
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: colors.surfaceContainerHighest,
-                                    borderRadius: BorderRadius.circular(999),
-                                  ),
-                                  child: Text(
-                                    _dateHeading(msg.createdAt),
-                                    style: TextStyle(
-                                      fontSize: 10.5,
-                                      color: colors.onSurfaceVariant,
-                                      fontWeight: FontWeight.w600,
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (showDateHeader)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 10,
+                                ),
+                                child: Center(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: colors.surfaceContainerHighest,
+                                      borderRadius: BorderRadius.circular(999),
+                                    ),
+                                    child: Text(
+                                      _dateHeading(msg.createdAt),
+                                      style: TextStyle(
+                                        fontSize: 10.5,
+                                        color: colors.onSurfaceVariant,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
+                            GestureDetector(
+                              // In selection mode a tap (or long-press) picks
+                              // the message instead of the bubble's own actions.
+                              behavior: HitTestBehavior.opaque,
+                              onTap: _selecting
+                                  ? () => _toggleSelected(msg)
+                                  : null,
+                              onLongPress: _selecting
+                                  ? () => _toggleSelected(msg)
+                                  : null,
+                              child: AbsorbPointer(
+                                absorbing: _selecting,
+                                child: AnimatedContainer(
+                                  key: _keyFor(msg.messageId),
+                                  duration: const Duration(milliseconds: 250),
+                                  decoration: BoxDecoration(
+                                    color: _selectedIds.contains(msg.messageId)
+                                        ? _accent.withValues(alpha: 0.18)
+                                        : _currentHitId == msg.messageId
+                                        ? _accent.withValues(alpha: 0.12)
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(
+                                      AppRadius.md,
+                                    ),
+                                  ),
+                                  child: _MessageBubble(
+                                    key: ValueKey(msg.messageId),
+                                    message: msg,
+                                    mine: mine,
+                                    highlight: _searching && _query.isNotEmpty
+                                        ? _query
+                                        : null,
+                                    senderName: !mine && _isGroup
+                                        ? _memberName(msg.senderId)
+                                        : null,
+                                    replyFromName: msg.replySenderId != null
+                                        ? _memberName(msg.replySenderId!)
+                                        : null,
+                                    seen:
+                                        isLastOfMine &&
+                                        !msg.isDeleted &&
+                                        _isSeenByOthers(msg),
+                                    onLongPress: () => _openActionMenu(msg),
+                                    onSwipeReply: () => _startReply(msg),
+                                    onReplyTap: msg.replyToMessageId != null
+                                        ? () => _scrollToMessage(
+                                            msg.replyToMessageId!,
+                                          )
+                                        : null,
+                                    onReactTap: (emoji) =>
+                                        _react(msg.messageId, emoji),
+                                    onReactionLongPress: (emoji, names) =>
+                                        _showReactionViewer(emoji, names),
+                                  ),
+                                ),
+                              ),
                             ),
-                          AnimatedContainer(
-                            key: _keyFor(msg.messageId),
-                            duration: const Duration(milliseconds: 250),
-                            decoration: BoxDecoration(
-                              color: _currentHitId == msg.messageId
-                                  ? _accent.withValues(alpha: 0.12)
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(AppRadius.md),
+                          ],
+                        );
+                      },
+                    ),
+            ),
+            if (_replyingTo != null || _editingMsg != null)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                color: colors.surfaceContainerHighest,
+                child: Row(
+                  children: [
+                    Container(width: 3, height: 30, color: _accent),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _editingMsg != null
+                                ? 'Editing message'
+                                : 'Replying to ${_replyingTo!.senderId == myId ? 'yourself' : (_memberName(_replyingTo!.senderId) ?? '')}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: _accent,
                             ),
-                            child: _MessageBubble(
-                              key: ValueKey(msg.messageId),
-                              message: msg,
-                              mine: mine,
-                              highlight: _searching && _query.isNotEmpty
-                                  ? _query
-                                  : null,
-                              senderName: !mine && _isGroup
-                                  ? _memberName(msg.senderId)
-                                  : null,
-                              replyFromName: msg.replySenderId != null
-                                  ? _memberName(msg.replySenderId!)
-                                  : null,
-                              seen:
-                                  isLastOfMine &&
-                                  !msg.isDeleted &&
-                                  _isSeenByOthers(msg),
-                              onLongPress: () => _openActionMenu(msg),
-                              onSwipeReply: () => _startReply(msg),
-                              onReplyTap: msg.replyToMessageId != null
-                                  ? () =>
-                                        _scrollToMessage(msg.replyToMessageId!)
-                                  : null,
-                              onReactTap: (emoji) =>
-                                  _react(msg.messageId, emoji),
-                              onReactionLongPress: (emoji, names) =>
-                                  _showReactionViewer(emoji, names),
+                          ),
+                          Text(
+                            _editingMsg?.message ?? _replyingTo?.message ?? '',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: colors.onSurfaceVariant,
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
-                      );
-                    },
-                  ),
-          ),
-          if (_replyingTo != null || _editingMsg != null)
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => setState(() {
+                        _replyingTo = null;
+                        _editingMsg = null;
+                        _textController.clear();
+                      }),
+                      icon: const Icon(Icons.close, size: 18),
+                    ),
+                  ],
+                ),
+              ),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              color: colors.surfaceContainerHighest,
+              padding: EdgeInsets.fromLTRB(
+                8,
+                8,
+                8,
+                8 + MediaQuery.of(context).padding.bottom,
+              ),
+              decoration: BoxDecoration(
+                color: colors.surface,
+                border: Border(top: BorderSide(color: colors.outlineVariant)),
+              ),
               child: Row(
                 children: [
-                  Container(width: 3, height: 30, color: _accent),
-                  const SizedBox(width: 8),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _editingMsg != null
-                              ? 'Editing message'
-                              : 'Replying to ${_replyingTo!.senderId == myId ? 'yourself' : (_memberName(_replyingTo!.senderId) ?? '')}',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: _accent,
-                          ),
+                    child: TextField(
+                      controller: _textController,
+                      onChanged: _onTextChanged,
+                      minLines: 1,
+                      maxLines: 4,
+                      decoration: InputDecoration(
+                        hintText: _editingMsg != null
+                            ? 'Edit your message…'
+                            : 'Type a message…',
+                        filled: true,
+                        fillColor: colors.surfaceContainerHighest,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
                         ),
-                        Text(
-                          _editingMsg?.message ?? _replyingTo?.message ?? '',
-                          style: TextStyle(
-                            fontSize: 12,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(999),
+                          borderSide: BorderSide.none,
+                        ),
+                        suffixIcon: IconButton(
+                          onPressed: _openEmojiPicker,
+                          icon: Icon(
+                            Icons.emoji_emotions_outlined,
+                            size: 20,
                             color: colors.onSurfaceVariant,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
-                      ],
+                      ),
                     ),
                   ),
-                  IconButton(
-                    onPressed: () => setState(() {
-                      _replyingTo = null;
-                      _editingMsg = null;
-                      _textController.clear();
-                    }),
-                    icon: const Icon(Icons.close, size: 18),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: _sending ? null : _send,
+                    child: Container(
+                      height: 42,
+                      width: 42,
+                      decoration: BoxDecoration(
+                        color: _accent,
+                        shape: BoxShape.circle,
+                      ),
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 150),
+                        child: _sending
+                            ? const Padding(
+                                key: ValueKey('sending'),
+                                padding: EdgeInsets.all(10),
+                                child: AppLoader(color: Colors.white),
+                              )
+                            : const Icon(
+                                Icons.send,
+                                key: ValueKey('send'),
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
-          Container(
-            padding: EdgeInsets.fromLTRB(
-              8,
-              8,
-              8,
-              8 + MediaQuery.of(context).padding.bottom,
-            ),
-            decoration: BoxDecoration(
-              color: colors.surface,
-              border: Border(top: BorderSide(color: colors.outlineVariant)),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _textController,
-                    onChanged: _onTextChanged,
-                    minLines: 1,
-                    maxLines: 4,
-                    decoration: InputDecoration(
-                      hintText: _editingMsg != null
-                          ? 'Edit your message…'
-                          : 'Type a message…',
-                      filled: true,
-                      fillColor: colors.surfaceContainerHighest,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 10,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(999),
-                        borderSide: BorderSide.none,
-                      ),
-                      suffixIcon: IconButton(
-                        onPressed: _openEmojiPicker,
-                        icon: Icon(
-                          Icons.emoji_emotions_outlined,
-                          size: 20,
-                          color: colors.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: _sending ? null : _send,
-                  child: Container(
-                    height: 42,
-                    width: 42,
-                    decoration: BoxDecoration(
-                      color: _accent,
-                      shape: BoxShape.circle,
-                    ),
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 150),
-                      child: _sending
-                          ? const Padding(
-                              key: ValueKey('sending'),
-                              padding: EdgeInsets.all(10),
-                              child: AppLoader(color: Colors.white),
-                            )
-                          : const Icon(
-                              Icons.send,
-                              key: ValueKey('send'),
-                              color: Colors.white,
-                              size: 18,
-                            ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1517,6 +1779,22 @@ class _MessageBubbleState extends State<_MessageBubble> {
   List<InlineSpan> _messageSpans(String text) {
     _clearLinkTaps();
     final spans = <InlineSpan>[];
+    if (isForwarded(text)) {
+      spans.add(
+        TextSpan(
+          text: '↪ Forwarded\n',
+          style: TextStyle(
+            fontSize: 11.5,
+            fontStyle: FontStyle.italic,
+            fontWeight: FontWeight.w500,
+            color: widget.mine
+                ? Colors.white70
+                : Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+      );
+      text = stripForwarded(text);
+    }
     for (final seg in linkify(text)) {
       if (!seg.isLink) {
         spans.addAll(_highlighted(seg.text, widget.highlight, widget.mine));

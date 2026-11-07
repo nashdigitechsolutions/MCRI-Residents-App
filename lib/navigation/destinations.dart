@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../screens/admin/admin_dashboard_screen.dart';
+import '../screens/admin/admin_profiles_screen.dart';
 import '../screens/duties_screen.dart';
 import '../screens/equipment_screen.dart';
 import '../screens/events_screen.dart';
@@ -77,6 +78,14 @@ final List<AppDestination> appDestinations = [
     caption: 'Manage residents, roles and requests',
     routeName: 'admin_dashboard',
     builder: () => const AdminDashboardScreen(),
+    adminOnly: true,
+  ),
+  AppDestination(
+    icon: Icons.groups_2_outlined,
+    label: 'All profiles',
+    caption: 'View everyone · log in as a user',
+    routeName: 'admin_profiles',
+    builder: () => const AdminProfilesScreen(),
     adminOnly: true,
   ),
 ];
