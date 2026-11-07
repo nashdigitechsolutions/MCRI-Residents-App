@@ -68,8 +68,6 @@ class _PollsScreenState extends State<PollsScreen> with LiveRefresh {
         content: Text(message),
         backgroundColor: isError ? _red : null,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-        margin: const EdgeInsets.only(bottom: 24, left: 60, right: 60),
       ),
     );
   }
@@ -388,7 +386,7 @@ class _VoteCardState extends State<_VoteCard> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: colors.outlineVariant),
       ),
       child: Column(
@@ -507,7 +505,7 @@ class _VoteCardState extends State<_VoteCard> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: colors.onSurface,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(999),
+                    borderRadius: BorderRadius.circular(AppRadius.sm + 2),
                   ),
                 ),
                 child: _submitting
@@ -636,7 +634,7 @@ class _ManagePollCardState extends State<_ManagePollCard> {
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: colors.outlineVariant),
       ),
       clipBehavior: Clip.antiAlias,
@@ -909,7 +907,7 @@ class _VotersSheetState extends State<_VotersSheet> {
         return Container(
           decoration: BoxDecoration(
             color: colors.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
           child: Column(
@@ -1051,9 +1049,8 @@ class _VotersSheetState extends State<_VotersSheet> {
                                       children: [
                                         CircleAvatar(
                                           radius: 12,
-                                          backgroundColor: const Color(
-                                            0xFF3355FF,
-                                          ).withValues(alpha: 0.12),
+                                          backgroundColor: AppColors.primary
+                                              .withValues(alpha: 0.12),
                                           child: Text(
                                             v.residentName.isNotEmpty
                                                 ? v.residentName[0]
@@ -1202,7 +1199,7 @@ class _ShareSheetState extends State<_ShareSheet> {
       child: Container(
         decoration: BoxDecoration(
           color: colors.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
         child: Column(
@@ -1277,7 +1274,7 @@ class _ShareSheetState extends State<_ShareSheet> {
                     backgroundColor: const Color(0xFF25D366),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(999),
+                      borderRadius: BorderRadius.circular(AppRadius.sm + 2),
                     ),
                   ),
                 ),
@@ -1293,7 +1290,7 @@ class _ShareSheetState extends State<_ShareSheet> {
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(color: colors.outlineVariant),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(999),
+                      borderRadius: BorderRadius.circular(AppRadius.sm + 2),
                     ),
                   ),
                 ),
@@ -1435,7 +1432,7 @@ class _NewPollSheetState extends State<_NewPollSheet> {
         ),
         decoration: BoxDecoration(
           color: colors.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
         child: Column(
@@ -1602,7 +1599,9 @@ class _NewPollSheetState extends State<_NewPollSheet> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: colors.onSurface,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(999),
+                            borderRadius: BorderRadius.circular(
+                              AppRadius.sm + 2,
+                            ),
                           ),
                         ),
                         child: _submitting
@@ -1749,7 +1748,7 @@ class _LunchboxSheetState extends State<_LunchboxSheet> {
             decoration: BoxDecoration(
               color: colors.surface,
               borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(28),
+                top: Radius.circular(20),
               ),
             ),
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),

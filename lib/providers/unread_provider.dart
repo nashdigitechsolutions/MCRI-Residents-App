@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 
 import '../services/api_service.dart';
 
@@ -26,7 +27,7 @@ class UnreadProvider extends ChangeNotifier {
   void setChatBadgeEnabled(bool enabled) {
     if (_chatBadgeEnabled == enabled) return;
     _chatBadgeEnabled = enabled;
-    notifyListeners();
+    _safeNotify();
   }
 
   /// The conversation screen currently on display (null when none). Messages
@@ -102,7 +103,7 @@ class UnreadProvider extends ChangeNotifier {
       if (active != null) _optimisticReads[active] = _readStamp(active);
       _unreadConversations = _computeUnread(_conversationsCache);
 
-      notifyListeners();
+      _safeNotify();
     } catch (e) {
       // silent — badges stay at their last known value
     }
@@ -131,7 +132,7 @@ class UnreadProvider extends ChangeNotifier {
 
   void onNotificationEvent() {
     _unreadNotifications++;
-    notifyListeners();
+    _safeNotify();
   }
 
   void _applyActivity(int convId, DateTime? at) {
@@ -161,7 +162,7 @@ class UnreadProvider extends ChangeNotifier {
     }
 
     _unreadConversations = _computeUnread(_conversationsCache);
-    notifyListeners();
+    _safeNotify();
   }
 
   // ------------------------------------------------------------------------
@@ -202,7 +203,7 @@ class UnreadProvider extends ChangeNotifier {
     _optimisticReads[conversationId] = _readStamp(conversationId);
     _unreadConversations = _computeUnread(_conversationsCache);
     _readEvents.add(conversationId);
-    notifyListeners();
+    _safeNotify();
     if (syncServer) {
       ApiService.post(
         '/conversations/$conversationId/read',
@@ -213,11 +214,34 @@ class UnreadProvider extends ChangeNotifier {
 
   void markNotificationsRead() {
     _unreadNotifications = 0;
+    _safeNotify();
+  }
+
+  /// notifyListeners() that is safe to call from initState/build (e.g. a
+  /// chat screen marking itself read as it opens): if a frame is being
+  /// built right now, listeners are told just after it instead of during
+  /// it, which Flutter forbids ("setState() called during build").
+  bool _notifyScheduled = false;
+  void _safeNotify() {
+    final phase = SchedulerBinding.instance.schedulerPhase;
+    if (phase == SchedulerPhase.persistentCallbacks ||
+        phase == SchedulerPhase.midFrameMicrotasks) {
+      if (_notifyScheduled) return;
+      _notifyScheduled = true;
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        _notifyScheduled = false;
+        if (!_disposed) notifyListeners();
+      });
+      return;
+    }
     notifyListeners();
   }
 
+  bool _disposed = false;
+
   @override
   void dispose() {
+    _disposed = true;
     _readEvents.close();
     super.dispose();
   }
@@ -228,6 +252,6 @@ class UnreadProvider extends ChangeNotifier {
     _optimisticReads.clear();
     _conversationsCache = [];
     _activeConversationId = null;
-    notifyListeners();
+    _safeNotify();
   }
 }

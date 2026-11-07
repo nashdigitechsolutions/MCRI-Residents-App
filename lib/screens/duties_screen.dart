@@ -164,8 +164,6 @@ class _DutiesScreenState extends State<DutiesScreen>
         content: Text(message),
         backgroundColor: isError ? _red : null,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-        margin: const EdgeInsets.only(bottom: 24, left: 60, right: 60),
       ),
     );
   }
@@ -1004,12 +1002,13 @@ class _DutiesScreenState extends State<DutiesScreen>
   Widget _dayPeople(ColorScheme colors) {
     final day = _days.firstWhere((d) => d.num == _selectedDay);
     final people = _rosterForDay(day.num);
-    return Container(
-      decoration: BoxDecoration(
-        color: colors.surface,
+    return Material(
+      color: colors.surface,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: colors.outlineVariant),
+        side: BorderSide(color: colors.outlineVariant),
       ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1150,7 +1149,7 @@ class _DayRosterSheet extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
       child: Column(
@@ -1348,7 +1347,7 @@ class _AssignDutySheetState extends State<_AssignDutySheet> {
         ),
         decoration: BoxDecoration(
           color: colors.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
         child: Column(
@@ -1496,7 +1495,9 @@ class _AssignDutySheetState extends State<_AssignDutySheet> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: colors.onSurface,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(999),
+                            borderRadius: BorderRadius.circular(
+                              AppRadius.sm + 2,
+                            ),
                           ),
                         ),
                         child: _submitting
@@ -1601,7 +1602,7 @@ class _AddToRosterSheetState extends State<_AddToRosterSheet> {
       child: Container(
         decoration: BoxDecoration(
           color: colors.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
         child: Column(
@@ -1678,7 +1679,7 @@ class _AddToRosterSheetState extends State<_AddToRosterSheet> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: colors.onSurface,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(999),
+                    borderRadius: BorderRadius.circular(AppRadius.sm + 2),
                   ),
                 ),
                 child: _submitting

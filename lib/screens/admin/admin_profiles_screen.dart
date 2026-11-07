@@ -497,11 +497,12 @@ class _ProfileSheetState extends State<_ProfileSheet> {
       initialChildSize: 0.78,
       maxChildSize: 0.95,
       minChildSize: 0.5,
-      builder: (context, scroll) => Container(
-        decoration: BoxDecoration(
-          color: colors.surface,
+      builder: (context, scroll) => Material(
+        color: colors.surface,
+        shape: RoundedRectangleBorder(
           borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
+        clipBehavior: Clip.antiAlias,
         child: ListView(
           controller: scroll,
           padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),

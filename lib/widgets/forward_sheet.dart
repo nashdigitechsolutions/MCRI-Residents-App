@@ -121,11 +121,12 @@ class _ForwardSheetState extends State<_ForwardSheet> {
       expand: false,
       initialChildSize: 0.8,
       maxChildSize: 0.95,
-      builder: (context, scroll) => Container(
-        decoration: BoxDecoration(
-          color: colors.surface,
+      builder: (context, scroll) => Material(
+        color: colors.surface,
+        shape: RoundedRectangleBorder(
           borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
+        clipBehavior: Clip.antiAlias,
         child: Column(
           children: [
             Padding(

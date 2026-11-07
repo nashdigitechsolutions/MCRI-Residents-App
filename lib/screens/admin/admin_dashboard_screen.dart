@@ -457,7 +457,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     return Container(
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: colors.outlineVariant),
       ),
       clipBehavior: Clip.antiAlias,
@@ -501,7 +501,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           side: BorderSide(color: colors.outlineVariant),
           padding: const EdgeInsets.symmetric(horizontal: 12),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(999),
+            borderRadius: BorderRadius.circular(AppRadius.sm + 2),
           ),
         ),
         child: spinning
@@ -536,7 +536,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           backgroundColor: colors.onSurface,
           padding: const EdgeInsets.symmetric(horizontal: 12),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(999),
+            borderRadius: BorderRadius.circular(AppRadius.sm + 2),
           ),
         ),
         child: spinning
@@ -565,12 +565,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   ) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(AppRadius.md),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
           color: colors.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppRadius.md),
         ),
         child: Row(
           children: [
@@ -613,7 +613,7 @@ class _StatTile extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: colors.outlineVariant),
       ),
       child: Column(
@@ -765,7 +765,7 @@ class _BroadcastSheetState extends State<_BroadcastSheet> {
       child: Container(
         decoration: BoxDecoration(
           color: colors.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
         child: Column(
@@ -815,7 +815,7 @@ class _BroadcastSheetState extends State<_BroadcastSheet> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: colors.onSurface,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(999),
+                    borderRadius: BorderRadius.circular(AppRadius.sm + 2),
                   ),
                 ),
                 child: _submitting

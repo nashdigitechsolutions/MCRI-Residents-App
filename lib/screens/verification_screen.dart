@@ -226,7 +226,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: const Color(0xFFECFDF5),
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(AppRadius.md),
             ),
             child: const Column(
               children: [

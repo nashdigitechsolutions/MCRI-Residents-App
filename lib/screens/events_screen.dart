@@ -64,8 +64,6 @@ class _EventsScreenState extends State<EventsScreen> {
         content: Text(message),
         backgroundColor: isError ? _red : null,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-        margin: const EdgeInsets.only(bottom: 24, left: 60, right: 60),
       ),
     );
   }
@@ -459,7 +457,7 @@ class _MonthGrid extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: colors.outlineVariant),
       ),
       clipBehavior: Clip.antiAlias,
@@ -594,11 +592,11 @@ class _UpcomingRow extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: colors.outlineVariant),
       ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(12),
@@ -737,7 +735,7 @@ class _DayAgendaSheet extends StatelessWidget {
         ),
         decoration: BoxDecoration(
           color: colors.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
         child: Column(
@@ -837,7 +835,7 @@ class _DayAgendaSheet extends StatelessWidget {
                   side: BorderSide(color: colors.outlineVariant),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(999),
+                    borderRadius: BorderRadius.circular(AppRadius.sm + 2),
                   ),
                 ),
               ),
@@ -869,7 +867,7 @@ class _EventDetailSheet extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
       child: Column(
@@ -1101,7 +1099,7 @@ class _AttendeesSheetState extends State<_AttendeesSheet> {
         return Container(
           decoration: BoxDecoration(
             color: colors.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
           child: Column(
@@ -1233,72 +1231,78 @@ class _EventActionSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     return SafeArea(
-      child: Container(
-        decoration: BoxDecoration(
-          color: colors.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      child: Material(
+        color: colors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    event.title,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: colors.onSurface,
+        clipBehavior: Clip.antiAlias,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      event.title,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: colors.onSurface,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(
-                    DateFormat('EEE, MMM d · h:mm a').format(event.startDate),
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      color: colors.onSurfaceVariant,
+                    Text(
+                      DateFormat('EEE, MMM d · h:mm a').format(event.startDate),
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: colors.onSurfaceVariant,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            Divider(height: 1, color: colors.outlineVariant),
-            ListTile(
-              leading: Icon(Icons.info_outline, color: colors.onSurfaceVariant),
-              title: const Text('View details'),
-              onTap: onView,
-            ),
-            ListTile(
-              leading: Icon(
-                Icons.event_available_outlined,
-                color: colors.onSurfaceVariant,
-              ),
-              title: const Text('Add to Google Calendar'),
-              onTap: onGoogleCalendar,
-            ),
-            if (canManage) ...[
+              Divider(height: 1, color: colors.outlineVariant),
               ListTile(
                 leading: Icon(
-                  Icons.copy_outlined,
+                  Icons.info_outline,
                   color: colors.onSurfaceVariant,
                 ),
-                title: const Text('Duplicate'),
-                onTap: onDuplicate,
+                title: const Text('View details'),
+                onTap: onView,
               ),
               ListTile(
-                leading: const Icon(Icons.delete_outline, color: _red),
-                title: const Text(
-                  'Remove from calendar',
-                  style: TextStyle(color: _red),
+                leading: Icon(
+                  Icons.event_available_outlined,
+                  color: colors.onSurfaceVariant,
                 ),
-                onTap: onDelete,
+                title: const Text('Add to Google Calendar'),
+                onTap: onGoogleCalendar,
               ),
+              if (canManage) ...[
+                ListTile(
+                  leading: Icon(
+                    Icons.copy_outlined,
+                    color: colors.onSurfaceVariant,
+                  ),
+                  title: const Text('Duplicate'),
+                  onTap: onDuplicate,
+                ),
+                ListTile(
+                  leading: const Icon(Icons.delete_outline, color: _red),
+                  title: const Text(
+                    'Remove from calendar',
+                    style: TextStyle(color: _red),
+                  ),
+                  onTap: onDelete,
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -1415,7 +1419,7 @@ class _NewEventSheetState extends State<_NewEventSheet> {
         ),
         decoration: BoxDecoration(
           color: colors.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
         child: Column(
@@ -1541,7 +1545,9 @@ class _NewEventSheetState extends State<_NewEventSheet> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: colors.onSurface,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(999),
+                            borderRadius: BorderRadius.circular(
+                              AppRadius.sm + 2,
+                            ),
                           ),
                         ),
                         child: _submitting

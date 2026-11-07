@@ -11,6 +11,7 @@ import 'providers/websocket_provider.dart';
 import 'screens/conversation_detail_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_shell.dart';
+import 'services/api_service.dart';
 import 'services/deep_link_service.dart';
 import 'services/device_registration_service.dart';
 import 'services/notification_router.dart';
@@ -221,6 +222,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) ApiService.invalidateAll();
     if (state == AppLifecycleState.resumed && _authProvider.isLoggedIn) {
       _unreadProvider.refresh();
     }

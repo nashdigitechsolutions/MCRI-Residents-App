@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../config/env.dart';
+import '../services/api_service.dart';
 
 const _pingInterval = Duration(seconds: 25);
 const _pongTimeout = Duration(seconds: 10);
@@ -40,6 +41,9 @@ class WebSocketProvider extends ChangeNotifier {
   }
 
   void _dispatch(String type, dynamic payload) {
+    // Any server event means some data changed: drop the short-lived GET
+    // cache so the refetch that follows sees it. (Typing is just a hint.)
+    if (type != 'typing') ApiService.invalidateAll();
     for (final cb in (_listeners[type] ?? const {})) {
       cb(payload);
     }

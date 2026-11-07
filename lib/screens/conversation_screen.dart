@@ -289,7 +289,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             color: _red.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(AppRadius.md),
                           ),
                           child: Text(
                             _error!,
@@ -354,10 +354,10 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
               color: _accent,
               elevation: 4,
               shadowColor: _accent.withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(AppRadius.md),
               child: InkWell(
                 onTap: _openNewConversationSheet,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(AppRadius.md),
                 child: const SizedBox(
                   width: 48,
                   height: 48,
@@ -413,7 +413,7 @@ class _ConversationRow extends StatelessWidget {
         alignment: Alignment.centerRight,
         decoration: BoxDecoration(
           color: AppColors.danger,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppRadius.md),
         ),
         child: const Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -649,7 +649,7 @@ class _NewConversationSheetState extends State<_NewConversationSheet> {
         ),
         decoration: BoxDecoration(
           color: colors.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
         child: Column(
@@ -775,7 +775,7 @@ class _NewConversationSheetState extends State<_NewConversationSheet> {
                                 ? _selected.remove(userId)
                                 : _selected.add(userId),
                           ),
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                           child: Container(
                             margin: const EdgeInsets.symmetric(vertical: 2),
                             padding: const EdgeInsets.symmetric(
@@ -786,7 +786,7 @@ class _NewConversationSheetState extends State<_NewConversationSheet> {
                               color: isSelected
                                   ? _accent.withValues(alpha: 0.1)
                                   : Colors.transparent,
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: BorderRadius.circular(AppRadius.md),
                             ),
                             child: Row(
                               children: [
@@ -875,7 +875,7 @@ class _NewConversationSheetState extends State<_NewConversationSheet> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: colors.onSurface,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(999),
+                    borderRadius: BorderRadius.circular(AppRadius.sm + 2),
                   ),
                 ),
                 child: _submitting

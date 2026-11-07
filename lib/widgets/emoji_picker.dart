@@ -1,3 +1,4 @@
+import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 
 class _EmojiEntry {
@@ -103,7 +104,7 @@ class _EmojiPickerPanelState extends State<EmojiPickerPanel> {
       width: 300,
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: colors.outlineVariant),
       ),
       child: Column(

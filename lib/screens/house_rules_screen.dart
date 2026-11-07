@@ -51,8 +51,6 @@ class _HouseRulesScreenState extends State<HouseRulesScreen> {
         content: Text(message),
         backgroundColor: isError ? _red : null,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-        margin: const EdgeInsets.only(bottom: 24, left: 60, right: 60),
       ),
     );
   }
@@ -147,7 +145,7 @@ class _HouseRulesScreenState extends State<HouseRulesScreen> {
                         end: Alignment.bottomRight,
                         colors: [_accent, _accent.withValues(alpha: 0.75)],
                       ),
-                      borderRadius: BorderRadius.circular(24),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                     ),
                     child: Row(
                       children: [
@@ -156,7 +154,7 @@ class _HouseRulesScreenState extends State<HouseRulesScreen> {
                           width: 44,
                           decoration: BoxDecoration(
                             color: Colors.white.withValues(alpha: 0.18),
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(AppRadius.md),
                           ),
                           child: const Icon(
                             Icons.menu_book_rounded,
@@ -203,7 +201,7 @@ class _HouseRulesScreenState extends State<HouseRulesScreen> {
                   Container(
                     decoration: BoxDecoration(
                       color: colors.surface,
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                       border: Border.all(color: colors.outlineVariant),
                     ),
                     clipBehavior: Clip.antiAlias,
@@ -529,7 +527,7 @@ class _RuleFormSheetState extends State<_RuleFormSheet> {
       child: Container(
         decoration: BoxDecoration(
           color: colors.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
         child: Column(
@@ -588,7 +586,7 @@ class _RuleFormSheetState extends State<_RuleFormSheet> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: colors.onSurface,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(999),
+                    borderRadius: BorderRadius.circular(AppRadius.sm + 2),
                   ),
                 ),
                 child: _submitting

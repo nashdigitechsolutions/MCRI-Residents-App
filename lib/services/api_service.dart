@@ -188,16 +188,58 @@ class ApiService {
     };
   }
 
-  static Future<dynamic> get(String path) => _send('GET', path, retry: true);
+  // ── Speed: share in-flight GETs and remember answers for a few seconds ──
+  //
+  // Home, the tabs and the screens you bounce between ask for the same lists
+  // (/announcements, /events, /duties, /conversations …). Identical GETs in
+  // flight share one request, and a just-fetched answer is reused for
+  // [_cacheTtl]. Freshness is protected: every write (POST/PATCH/PUT/DELETE),
+  // every live server event and every account change clears it.
+  static const _cacheTtl = Duration(seconds: 8);
+  static final Map<String, Future<dynamic>> _inflight = {};
+  static final Map<String, ({DateTime at, dynamic data})> _cache = {};
+
+  /// Forget everything cached (writes, live events, sign-in/out, resume).
+  static void invalidateAll() {
+    _cache.clear();
+    _inflight.clear();
+  }
+
+  static Future<dynamic> get(String path, {bool fresh = false}) {
+    final key = '${StorageService.cachedToken.hashCode}:$path';
+    if (!fresh) {
+      final hit = _cache[key];
+      if (hit != null && DateTime.now().difference(hit.at) < _cacheTtl) {
+        return Future.value(hit.data);
+      }
+      final pending = _inflight[key];
+      if (pending != null) return pending;
+    }
+    final request = _send('GET', path, retry: true).then((data) {
+      _cache[key] = (at: DateTime.now(), data: data);
+      return data;
+    }).whenComplete(() {
+      // Block body on purpose: `=> _inflight.remove(key)` would RETURN this
+      // very Future, and whenComplete would then wait on itself forever.
+      _inflight.remove(key);
+    });
+    _inflight[key] = request;
+    return request;
+  }
+
+  static Future<dynamic> _write(String method, String path, [Object? body]) {
+    invalidateAll();
+    return _send(method, path, body: body).whenComplete(invalidateAll);
+  }
 
   static Future<dynamic> post(String path, [dynamic body = const {}]) =>
-      _send('POST', path, body: body);
+      _write('POST', path, body);
 
   static Future<dynamic> patch(String path, Map<String, dynamic> body) =>
-      _send('PATCH', path, body: body);
+      _write('PATCH', path, body);
 
   static Future<dynamic> put(String path, Map<String, dynamic> body) =>
-      _send('PUT', path, body: body);
+      _write('PUT', path, body);
 
-  static Future<dynamic> delete(String path) => _send('DELETE', path);
+  static Future<dynamic> delete(String path) => _write('DELETE', path);
 }

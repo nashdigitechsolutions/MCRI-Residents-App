@@ -19,6 +19,7 @@ void main() {
     FlutterSecureStorage.setMockInitialValues({});
     await StorageService.deleteToken();
     ApiService.onUnauthorized = null;
+    ApiService.invalidateAll();
   });
 
   group('config', () {
@@ -139,4 +140,24 @@ void main() {
     expect(taps, 1);
     expect(tester.takeException(), isNull); // no overflow
   });
+  group('ApiService GET cache', () {
+    test('identical GETs share one request; a write clears the cache', () async {
+      var hits = 0;
+      ApiService.client = MockClient((req) async {
+        if (req.method == 'GET') hits++;
+        return http.Response('[]', 200);
+      });
+      await Future.wait([ApiService.get('/rooms'), ApiService.get('/rooms')]);
+      expect(hits, 1, reason: 'in-flight request shared');
+      await ApiService.get('/rooms');
+      expect(hits, 1, reason: 'served from the short cache');
+      await ApiService.post('/rooms', {'room_number': '1'});
+      await ApiService.get('/rooms');
+      expect(hits, 2, reason: 'write invalidated the cache');
+      await ApiService.get('/rooms', fresh: true);
+      expect(hits, 3, reason: 'fresh bypasses the cache');
+    });
+  });
+
+
 }

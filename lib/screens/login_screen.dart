@@ -271,7 +271,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     decoration: const BoxDecoration(
                       color: _sheet,
                       borderRadius: BorderRadius.vertical(
-                        top: Radius.circular(32),
+                        top: Radius.circular(20),
                       ),
                     ),
                     child: Center(
@@ -470,7 +470,7 @@ class _LoginScreenState extends State<LoginScreen> {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: const Color(0xFFFFFBEB),
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppRadius.md),
             border: Border.all(color: const Color(0xFFFDE68A)),
           ),
           child: Column(

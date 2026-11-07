@@ -221,7 +221,7 @@ class _AdminRolesScreenState extends State<AdminRolesScreen> {
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: AppColors.warning.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(AppRadius.md),
           ),
           child: const Row(
             children: [
@@ -268,7 +268,7 @@ class _AdminRolesScreenState extends State<AdminRolesScreen> {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: colors.outlineVariant),
       ),
       child: Row(
@@ -463,7 +463,7 @@ class _AdminRolesScreenState extends State<AdminRolesScreen> {
     return Container(
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: colors.outlineVariant),
       ),
       clipBehavior: Clip.antiAlias,
@@ -542,7 +542,7 @@ class _NewRoleSheetState extends State<_NewRoleSheet> {
       child: Container(
         decoration: BoxDecoration(
           color: colors.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
         child: Column(
@@ -595,7 +595,7 @@ class _NewRoleSheetState extends State<_NewRoleSheet> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: colors.onSurface,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(999),
+                    borderRadius: BorderRadius.circular(AppRadius.sm + 2),
                   ),
                 ),
                 child: _submitting

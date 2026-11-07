@@ -105,6 +105,7 @@ void main() {
         '${entry.key} fits 320x640 @1.25x (${dark ? 'dark' : 'light'})',
         (tester) async {
           FlutterSecureStorage.setMockInitialValues({});
+        ApiService.invalidateAll();
           await StorageService.setToken(
             _jwt({
               'user_id': 1,

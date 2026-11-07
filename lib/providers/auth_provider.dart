@@ -133,6 +133,7 @@ class AuthProvider extends ChangeNotifier {
       await DeviceRegistrationService.unregister();
     }
     await StorageService.clearAll();
+    ApiService.invalidateAll();
     _token = null;
     _user = null;
     _claims = null;
@@ -198,6 +199,9 @@ class AuthProvider extends ChangeNotifier {
   }) {
     _token = token;
     _claims = payload;
+    // New account (sign-in, "Log in as", return to admin): nothing cached
+    // for the previous one may be shown.
+    ApiService.invalidateAll();
     _user = _userFromPayload(payload, fallbackEmail: fallbackEmail);
     _scheduleExpiry(payload);
   }

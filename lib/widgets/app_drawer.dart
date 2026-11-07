@@ -131,14 +131,14 @@ class _AppDrawerState extends State<AppDrawer>
       shadowColor: _accent.withValues(alpha: 0.25),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.only(
-          topRight: Radius.circular(28),
-          bottomRight: Radius.circular(28),
+          topRight: Radius.circular(20),
+          bottomRight: Radius.circular(20),
         ),
       ),
       child: ClipRRect(
         borderRadius: const BorderRadius.only(
-          topRight: Radius.circular(28),
-          bottomRight: Radius.circular(28),
+          topRight: Radius.circular(20),
+          bottomRight: Radius.circular(20),
         ),
         child: SafeArea(
           child: Column(
@@ -250,7 +250,7 @@ class _Header extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         boxShadow: [
           BoxShadow(
             color: _accent.withValues(alpha: 0.35),
@@ -265,7 +265,7 @@ class _Header extends StatelessWidget {
             padding: const EdgeInsets.all(3),
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.22),
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(AppRadius.md),
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(11),
@@ -364,14 +364,14 @@ class _DrawerRowState extends State<_DrawerRow> {
         curve: Curves.easeOutCubic,
         decoration: BoxDecoration(
           color: bgColor,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           boxShadow: shadows,
         ),
         child: Material(
           color: Colors.transparent,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           child: InkWell(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(AppRadius.md),
             splashColor: _accent.withValues(alpha: 0.15),
             highlightColor: _accent.withValues(alpha: 0.06),
             onTap: widget.onTap,
@@ -463,13 +463,13 @@ class _LogoutButtonState extends State<_LogoutButton> {
           color: _hovered
               ? _danger.withValues(alpha: 0.08)
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppRadius.md),
         ),
         child: Material(
           color: Colors.transparent,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           child: InkWell(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(AppRadius.md),
             splashColor: _danger.withValues(alpha: 0.15),
             onTap: widget.onTap,
             child: const Padding(

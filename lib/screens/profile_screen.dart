@@ -87,8 +87,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         content: Text(message),
         backgroundColor: isError ? _red : null,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-        margin: const EdgeInsets.only(bottom: 24, left: 60, right: 60),
       ),
     );
   }
@@ -332,7 +330,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ],
                 ),
                 borderRadius: BorderRadius.vertical(
-                  bottom: Radius.circular(28),
+                  bottom: Radius.circular(20),
                 ),
               ),
               child: Column(
@@ -906,7 +904,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
         ),
         decoration: BoxDecoration(
           color: colors.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
         child: Column(
@@ -1083,7 +1081,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                       ),
                       decoration: BoxDecoration(
                         color: colors.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
                       ),
                       child: SwitchListTile(
                         contentPadding: EdgeInsets.zero,
@@ -1113,7 +1111,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                       ),
                       decoration: BoxDecoration(
                         color: colors.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
                       ),
                       child: SwitchListTile(
                         contentPadding: EdgeInsets.zero,
@@ -1153,7 +1151,9 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: colors.onSurface,
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(999),
+                                  borderRadius: BorderRadius.circular(
+                                    AppRadius.sm + 2,
+                                  ),
                                 ),
                               ),
                               child: _submitting
@@ -1184,7 +1184,9 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                               style: OutlinedButton.styleFrom(
                                 side: BorderSide(color: colors.outlineVariant),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(999),
+                                  borderRadius: BorderRadius.circular(
+                                    AppRadius.sm + 2,
+                                  ),
                                 ),
                               ),
                               child: Text(
@@ -1326,7 +1328,7 @@ class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
         context: context,
         builder: (ctx) => AlertDialog(
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(AppRadius.md),
           ),
           title: const Text(
             'Use biometrics next time?',
@@ -1428,7 +1430,7 @@ class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
       child: Container(
         decoration: BoxDecoration(
           color: colors.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
         child: SingleChildScrollView(
@@ -1529,7 +1531,7 @@ class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: colors.onSurface,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(999),
+                        borderRadius: BorderRadius.circular(AppRadius.sm + 2),
                       ),
                     ),
                     child: _submitting

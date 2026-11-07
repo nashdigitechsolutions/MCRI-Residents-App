@@ -190,7 +190,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       color: n.isRead
                           ? colors.surface
                           : _accent.withValues(alpha: 0.06),
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                       border: Border.all(
                         color: n.isRead
                             ? colors.outlineVariant
@@ -200,7 +200,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     child: Material(
                       color: Colors.transparent,
                       child: InkWell(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
                         onTap: () => _open(n),
                         child: Padding(
                           padding: const EdgeInsets.all(14),

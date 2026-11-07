@@ -166,8 +166,6 @@ class _EquipmentScreenState extends State<EquipmentScreen> with LiveRefresh {
         content: Text(message),
         backgroundColor: isError ? _red : null,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-        margin: const EdgeInsets.only(bottom: 24, left: 60, right: 60),
       ),
     );
   }
@@ -438,14 +436,14 @@ class _EquipmentScreenState extends State<EquipmentScreen> with LiveRefresh {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Equipment'),
-        actions: _isAdmin
-            ? [
-                IconButton(
-                  onPressed: _openAddEquipmentSheet,
-                  icon: const Icon(Icons.add),
-                ),
-              ]
-            : null,
+        // Anyone can add an item to the shared list.
+        actions: [
+          IconButton(
+            onPressed: _openAddEquipmentSheet,
+            icon: const Icon(Icons.add_rounded),
+            tooltip: 'Add equipment to the list',
+          ),
+        ],
       ),
       body: _loading
           ? const AppLoadingView()
@@ -1141,7 +1139,7 @@ class _EquipmentScreenState extends State<EquipmentScreen> with LiveRefresh {
           ),
           padding: const EdgeInsets.symmetric(horizontal: 14),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(999),
+            borderRadius: BorderRadius.circular(AppRadius.sm + 2),
           ),
         ),
         child: showSpinner
@@ -1232,11 +1230,11 @@ class _EquipmentCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: colors.outlineVariant),
       ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(14),
@@ -1287,7 +1285,9 @@ class _EquipmentCard extends StatelessWidget {
                           backgroundColor: colors.onSurface,
                           padding: const EdgeInsets.symmetric(horizontal: 14),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(999),
+                            borderRadius: BorderRadius.circular(
+                              AppRadius.sm + 2,
+                            ),
                           ),
                         ),
                         child: requesting
@@ -1425,7 +1425,7 @@ class _EquipmentDetailSheet extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
       child: Column(
@@ -1450,7 +1450,7 @@ class _EquipmentDetailSheet extends StatelessWidget {
                 height: 48,
                 decoration: BoxDecoration(
                   color: statusMeta.color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                 ),
                 child: Icon(
                   Icons.build_outlined,
@@ -1535,7 +1535,7 @@ class _EquipmentDetailSheet extends StatelessWidget {
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: Color(0xFFFECACA)),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(999),
+                        borderRadius: BorderRadius.circular(AppRadius.sm + 2),
                       ),
                     ),
                   ),
@@ -1556,7 +1556,7 @@ class _EquipmentDetailSheet extends StatelessWidget {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: colors.onSurface,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(999),
+                          borderRadius: BorderRadius.circular(AppRadius.sm + 2),
                         ),
                       ),
                       child: requesting
@@ -1645,7 +1645,7 @@ class _AddEquipmentSheetState extends State<_AddEquipmentSheet> {
       child: Container(
         decoration: BoxDecoration(
           color: colors.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
         child: Column(
@@ -1703,7 +1703,7 @@ class _AddEquipmentSheetState extends State<_AddEquipmentSheet> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: colors.onSurface,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(999),
+                    borderRadius: BorderRadius.circular(AppRadius.sm + 2),
                   ),
                 ),
                 child: _submitting
@@ -1801,7 +1801,7 @@ class _ReportIssueSheetState extends State<_ReportIssueSheet> {
       child: Container(
         decoration: BoxDecoration(
           color: colors.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
         child: Column(
@@ -1850,7 +1850,7 @@ class _ReportIssueSheetState extends State<_ReportIssueSheet> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: colors.onSurface,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(999),
+                    borderRadius: BorderRadius.circular(AppRadius.sm + 2),
                   ),
                 ),
                 child: _submitting
@@ -1881,15 +1881,15 @@ class _ReportIssueSheetState extends State<_ReportIssueSheet> {
       fillColor: colors.surface,
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         borderSide: BorderSide(color: colors.outlineVariant),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         borderSide: BorderSide(color: colors.outlineVariant),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         borderSide: const BorderSide(color: _accent),
       ),
     );

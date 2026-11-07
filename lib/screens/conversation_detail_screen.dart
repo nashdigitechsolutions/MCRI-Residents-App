@@ -923,121 +923,132 @@ class _ConversationDetailScreenState extends State<ConversationDetailScreen>
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
+      // The menu has grown (copy, select, forward…): let it be tall and
+      // scroll on small phones instead of overflowing.
+      isScrollControlled: true,
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.85,
+      ),
       builder: (_) => SafeArea(
-        child: Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        child: Material(
+          color: Theme.of(context).colorScheme.surface,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                child: Row(
-                  children: _quickReactions
-                      .map(
-                        (e) => Expanded(
-                          child: InkWell(
-                            onTap: () {
-                              Navigator.of(context).pop();
-                              _react(msg.messageId, e);
-                            },
-                            borderRadius: BorderRadius.circular(999),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 6),
-                              child: Text(
-                                e,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(fontSize: 22),
+          clipBehavior: Clip.antiAlias,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  child: Row(
+                    children: _quickReactions
+                        .map(
+                          (e) => Expanded(
+                            child: InkWell(
+                              onTap: () {
+                                Navigator.of(context).pop();
+                                _react(msg.messageId, e);
+                              },
+                              borderRadius: BorderRadius.circular(999),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 6,
+                                ),
+                                child: Text(
+                                  e,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(fontSize: 22),
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      )
-                      .toList(),
+                        )
+                        .toList(),
+                  ),
                 ),
-              ),
-              const Divider(height: 1),
-              ListTile(
-                leading: const Icon(Icons.reply),
-                title: const Text('Reply'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _startReply(msg);
-                },
-              ),
-              if (!msg.isDeleted) ...[
+                const Divider(height: 1),
                 ListTile(
-                  leading: const Icon(Icons.copy_rounded),
-                  title: const Text('Copy'),
+                  leading: const Icon(Icons.reply),
+                  title: const Text('Reply'),
                   onTap: () {
                     Navigator.of(context).pop();
-                    _copy([msg]);
+                    _startReply(msg);
                   },
                 ),
-                ListTile(
-                  leading: const Icon(Icons.text_fields_rounded),
-                  title: const Text('Select text'),
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    _selectText(msg);
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.shortcut_rounded),
-                  title: const Text('Forward'),
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    _forward([msg]);
-                  },
-                ),
-                if (msg.messageId > 0)
+                if (!msg.isDeleted) ...[
                   ListTile(
-                    leading: const Icon(Icons.check_circle_outline_rounded),
-                    title: const Text('Select'),
-                    subtitle: const Text(
-                      'Pick several messages to copy or forward',
-                    ),
+                    leading: const Icon(Icons.copy_rounded),
+                    title: const Text('Copy'),
                     onTap: () {
                       Navigator.of(context).pop();
-                      _toggleSelected(msg);
+                      _copy([msg]);
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.text_fields_rounded),
+                    title: const Text('Select text'),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      _selectText(msg);
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.shortcut_rounded),
+                    title: const Text('Forward'),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      _forward([msg]);
+                    },
+                  ),
+                  if (msg.messageId > 0)
+                    ListTile(
+                      leading: const Icon(Icons.check_circle_outline_rounded),
+                      title: const Text('Select'),
+                      subtitle: const Text(
+                        'Pick several messages to copy or forward',
+                      ),
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        _toggleSelected(msg);
+                      },
+                    ),
+                ],
+                if (mine && msg.messageId > 0)
+                  ListTile(
+                    leading: const Icon(Icons.edit_outlined),
+                    title: const Text('Edit'),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      _startEdit(msg);
+                    },
+                  ),
+                ListTile(
+                  leading: Icon(
+                    msg.isPinned ? Icons.push_pin : Icons.push_pin_outlined,
+                  ),
+                  title: Text(msg.isPinned ? 'Unpin' : 'Pin'),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _togglePin(msg);
+                  },
+                ),
+                if ((mine || isAdmin) && msg.messageId > 0)
+                  ListTile(
+                    leading: const Icon(Icons.delete_outline, color: _red),
+                    title: const Text('Delete', style: TextStyle(color: _red)),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      _deleteMessage(msg);
                     },
                   ),
               ],
-              if (mine && msg.messageId > 0)
-                ListTile(
-                  leading: const Icon(Icons.edit_outlined),
-                  title: const Text('Edit'),
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    _startEdit(msg);
-                  },
-                ),
-              ListTile(
-                leading: Icon(
-                  msg.isPinned ? Icons.push_pin : Icons.push_pin_outlined,
-                ),
-                title: Text(msg.isPinned ? 'Unpin' : 'Pin'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _togglePin(msg);
-                },
-              ),
-              if ((mine || isAdmin) && msg.messageId > 0)
-                ListTile(
-                  leading: const Icon(Icons.delete_outline, color: _red),
-                  title: const Text('Delete', style: TextStyle(color: _red)),
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    _deleteMessage(msg);
-                  },
-                ),
-            ],
+            ),
           ),
         ),
       ),
@@ -1091,13 +1102,22 @@ class _ConversationDetailScreenState extends State<ConversationDetailScreen>
     );
   }
 
-  bool _isSeenByOthers(ChatMessage msg) {
+  /// 0 = sent, 1 = read by some of the others (groups), 2 = read by all.
+  int _readState(ChatMessage msg) {
     final myId = context.read<AuthProvider>().user?.userId;
+    final others = _members
+        .where((m) => m.userId != myId)
+        .map((m) => m.userId)
+        .toSet();
+    var read = 0;
     for (final entry in _reads.entries) {
       if (entry.key == myId) continue;
-      if (!entry.value.isBefore(msg.createdAt)) return true;
+      if (others.isNotEmpty && !others.contains(entry.key)) continue;
+      if (!entry.value.isBefore(msg.createdAt)) read++;
     }
-    return false;
+    if (read == 0) return 0;
+    final total = others.isEmpty ? read : others.length;
+    return read >= total ? 2 : 1;
   }
 
   PreferredSizeWidget _buildSearchBar(ColorScheme colors) {
@@ -1381,7 +1401,6 @@ class _ConversationDetailScreenState extends State<ConversationDetailScreen>
                               _messages[i - 1].createdAt,
                               msg.createdAt,
                             );
-                        final isLastOfMine = mine && i == _messages.length - 1;
 
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1450,10 +1469,11 @@ class _ConversationDetailScreenState extends State<ConversationDetailScreen>
                                     replyFromName: msg.replySenderId != null
                                         ? _memberName(msg.replySenderId!)
                                         : null,
-                                    seen:
-                                        isLastOfMine &&
-                                        !msg.isDeleted &&
-                                        _isSeenByOthers(msg),
+                                    // Ticks on EVERY message of mine, not
+                                    // just the last one.
+                                    readState: mine && !msg.isDeleted
+                                        ? _readState(msg)
+                                        : 0,
                                     onLongPress: () => _openActionMenu(msg),
                                     onSwipeReply: () => _startReply(msg),
                                     onReplyTap: msg.replyToMessageId != null
@@ -1713,7 +1733,9 @@ class _MessageBubble extends StatefulWidget {
   final bool mine;
   final String? senderName;
   final String? replyFromName;
-  final bool seen;
+
+  /// 0 = sent ✓, 1 = read by some ✓✓ (grey), 2 = read by all ✓✓ (orange).
+  final int readState;
   final VoidCallback onLongPress;
   final VoidCallback onSwipeReply;
   final VoidCallback? onReplyTap;
@@ -1729,7 +1751,7 @@ class _MessageBubble extends StatefulWidget {
     required this.mine,
     this.senderName,
     this.replyFromName,
-    required this.seen,
+    required this.readState,
     required this.onLongPress,
     required this.onSwipeReply,
     this.onReplyTap,
@@ -2050,14 +2072,25 @@ class _MessageBubbleState extends State<_MessageBubble> {
                       ),
                       if (widget.mine) ...[
                         const SizedBox(width: 3),
-                        Icon(
-                          msg.messageId < 0
-                              ? Icons.schedule
-                              : (widget.seen ? Icons.done_all : Icons.done),
-                          size: 12,
-                          color: widget.seen
-                              ? _accent
-                              : colors.onSurfaceVariant,
+                        Semantics(
+                          label: msg.messageId < 0
+                              ? 'Sending'
+                              : const [
+                                  'Sent',
+                                  'Read by some',
+                                  'Read',
+                                ][widget.readState],
+                          child: Icon(
+                            msg.messageId < 0
+                                ? Icons.schedule
+                                : (widget.readState > 0
+                                      ? Icons.done_all
+                                      : Icons.done),
+                            size: 13,
+                            color: widget.readState == 2 && msg.messageId > 0
+                                ? _accent
+                                : colors.onSurfaceVariant,
+                          ),
                         ),
                       ],
                     ],
@@ -2100,7 +2133,7 @@ class _MemberSheet extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
       child: Column(
@@ -2178,7 +2211,7 @@ class _MemberSheet extends StatelessWidget {
                   side: const BorderSide(color: _accent),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(999),
+                    borderRadius: BorderRadius.circular(AppRadius.sm + 2),
                   ),
                 ),
               ),
@@ -2197,7 +2230,7 @@ class _MemberSheet extends StatelessWidget {
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(999),
+                        borderRadius: BorderRadius.circular(AppRadius.sm + 2),
                       ),
                     ),
                   ),
@@ -2213,7 +2246,7 @@ class _MemberSheet extends StatelessWidget {
                       foregroundColor: colors.surface,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(999),
+                        borderRadius: BorderRadius.circular(AppRadius.sm + 2),
                       ),
                     ),
                   ),
@@ -2226,7 +2259,7 @@ class _MemberSheet extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 12),
               decoration: BoxDecoration(
                 color: colors.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(AppRadius.md),
               ),
               child: Center(
                 child: Text(
@@ -2257,7 +2290,7 @@ class _MemberSheet extends StatelessWidget {
                   side: const BorderSide(color: Color(0xFFFECACA)),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(999),
+                    borderRadius: BorderRadius.circular(AppRadius.sm + 2),
                   ),
                 ),
               ),
