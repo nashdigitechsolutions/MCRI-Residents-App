@@ -1,4 +1,7 @@
 import 'package:mcri_residents_app/widgets/app_loader.dart';
+
+import '../widgets/app_refresh.dart';
+
 import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -177,7 +180,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 ],
               ),
             )
-          : RefreshIndicator(
+          : AppRefreshIndicator(
               onRefresh: _load,
               child: ListView.builder(
                 padding: const EdgeInsets.all(16),

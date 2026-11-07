@@ -1,4 +1,7 @@
 import 'package:mcri_residents_app/widgets/app_loader.dart';
+
+import '../widgets/app_refresh.dart';
+
 import 'package:mcri_residents_app/theme/app_theme.dart';
 
 import 'dart:convert';
@@ -19,6 +22,7 @@ import '../utils/live_refresh.dart';
 import '../utils/initials.dart';
 import '../navigation/app_navigator.dart';
 import '../widgets/ui.dart';
+import 'wifi_payments_screen.dart';
 import 'duties_screen.dart';
 import 'events_screen.dart';
 import 'equipment_screen.dart';
@@ -299,7 +303,7 @@ class _HomeScreenState extends State<HomeScreen> with LiveRefresh {
     return Scaffold(
       body: _loading
           ? const AppLoadingView(message: 'Getting your residence ready…')
-          : RefreshIndicator(
+          : AppRefreshIndicator(
               onRefresh: _loadDashboard,
               child: ListView(
                 padding: EdgeInsets.zero,
@@ -445,6 +449,8 @@ class _HomeScreenState extends State<HomeScreen> with LiveRefresh {
                                   ),
                                 ],
                         ),
+                        const SizedBox(height: 14),
+                        const WifiPromoCard(),
                       ],
                     ),
                   ),

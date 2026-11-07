@@ -6,20 +6,24 @@ import 'package:mcri_residents_app/services/notification_router.dart';
 void main() {
   group('AppNotification.route', () {
     Map<String, dynamic> base(Object? data) => {
-          'user_notification_id': 7,
-          'title': 'New poll: Friday dinner',
-          'message': 'Vote now',
-          'created_at': '2026-11-06T10:00:00Z',
-          'data': data,
-        };
+      'user_notification_id': 7,
+      'title': 'New poll: Friday dinner',
+      'message': 'Vote now',
+      'created_at': '2026-11-06T10:00:00Z',
+      'data': data,
+    };
 
     test('parses a JSON object route', () {
-      final n = AppNotification.fromJson(base({'screen': 'poll', 'poll_id': 3}));
+      final n = AppNotification.fromJson(
+        base({'screen': 'poll', 'poll_id': 3}),
+      );
       expect(n.route, {'screen': 'poll', 'poll_id': 3});
     });
 
     test('parses a JSON-string route', () {
-      final n = AppNotification.fromJson(base('{"screen":"equipment","tab":"issues"}'));
+      final n = AppNotification.fromJson(
+        base('{"screen":"equipment","tab":"issues"}'),
+      );
       expect(n.route?['tab'], 'issues');
     });
 
@@ -30,11 +34,32 @@ void main() {
 
   group('NotificationRouter.inferFromTitle (rows stored before routes)', () {
     test('maps known titles', () {
-      expect(NotificationRouter.inferFromTitle('New poll: Lunch')?['screen'], 'poll');
-      expect(NotificationRouter.inferFromTitle('New announcement: Water off')?['screen'], 'home');
-      expect(NotificationRouter.inferFromTitle('Fault reported: Washing machine')?['screen'], 'equipment');
-      expect(NotificationRouter.inferFromTitle('Bought: Kettle')?['screen'], 'equipment');
-      expect(NotificationRouter.inferFromTitle('Welcome to MCRI Residents')?['screen'], 'profile');
+      expect(
+        NotificationRouter.inferFromTitle('New poll: Lunch')?['screen'],
+        'poll',
+      );
+      expect(
+        NotificationRouter.inferFromTitle(
+          'New announcement: Water off',
+        )?['screen'],
+        'home',
+      );
+      expect(
+        NotificationRouter.inferFromTitle(
+          'Fault reported: Washing machine',
+        )?['screen'],
+        'equipment',
+      );
+      expect(
+        NotificationRouter.inferFromTitle('Bought: Kettle')?['screen'],
+        'equipment',
+      );
+      expect(
+        NotificationRouter.inferFromTitle(
+          'Welcome to MCRI Residents',
+        )?['screen'],
+        'profile',
+      );
     });
 
     test('unknown titles have no destination', () {

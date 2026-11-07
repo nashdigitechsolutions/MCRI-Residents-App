@@ -1,4 +1,7 @@
 import 'package:mcri_residents_app/widgets/app_loader.dart';
+
+import '../widgets/app_refresh.dart';
+
 import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -417,7 +420,7 @@ class _DutiesScreenState extends State<DutiesScreen>
           : null,
       body: _loading
           ? const AppLoadingView(message: 'Loading duties…')
-          : RefreshIndicator(
+          : AppRefreshIndicator(
               onRefresh: _loadAll,
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),

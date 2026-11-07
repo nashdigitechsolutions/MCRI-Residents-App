@@ -1,4 +1,7 @@
 import 'package:mcri_residents_app/widgets/app_loader.dart';
+
+import '../widgets/app_refresh.dart';
+
 import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -7,9 +10,9 @@ import '../models/resident.dart';
 import '../models/room.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
+import '../widgets/ui.dart';
 
 const _amber = AppColors.warning;
-const _green = AppColors.success;
 const _red = AppColors.danger;
 
 class RoomsScreen extends StatefulWidget {
@@ -31,13 +34,14 @@ class _RoomsScreenState extends State<RoomsScreen> {
     _loadAll();
   }
 
-  Future<void> _loadAll() async {
-    setState(() => _loading = true);
+  Future<void> _loadAll({bool showLoading = true}) async {
+    if (showLoading) setState(() => _loading = true);
     try {
       final results = await Future.wait([
         ApiService.get('/rooms'),
         ApiService.get('/residents'),
       ]);
+      if (!mounted) return;
       setState(() {
         _rooms = (results[0] as List)
             .map((j) => Room.fromJson(j as Map<String, dynamic>))
@@ -142,10 +146,43 @@ class _RoomsScreenState extends State<RoomsScreen> {
     }
   }
 
+  String _roomFilter = 'all'; // all | space | full
+  String _roomSearch = '';
+
+  List<Room> _visibleRooms(int? myRoomId) {
+    final q = _roomSearch.trim().toLowerCase();
+    final list = _rooms.where((r) {
+      final full = r.currentOccupancy >= r.maxCapacity;
+      if (_roomFilter == 'space' && full) return false;
+      if (_roomFilter == 'full' && !full) return false;
+      if (q.isEmpty) return true;
+      return r.roomNumber.toLowerCase().contains(q) ||
+          _occupantsOf(r.roomId)
+              .any((o) => o.displayName.toLowerCase().contains(q));
+    }).toList();
+    // My room first, then natural room-number order.
+    list.sort((a, b) {
+      if (a.roomId == myRoomId) return -1;
+      if (b.roomId == myRoomId) return 1;
+      final na = int.tryParse(a.roomNumber), nb = int.tryParse(b.roomNumber);
+      if (na != null && nb != null) return na.compareTo(nb);
+      return a.roomNumber.compareTo(b.roomNumber);
+    });
+    return list;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isStaff = context.watch<AuthProvider>().user?.roleId == 1;
+    final auth = context.watch<AuthProvider>();
+    final isStaff = auth.user?.roleId == 1;
     final colors = Theme.of(context).colorScheme;
+    final me = _residents
+        .where((r) => r.userId == auth.user?.userId)
+        .firstOrNull;
+    final myRoom = _rooms.where((r) => r.roomId == me?.roomId).firstOrNull;
+    final beds = _rooms.fold<int>(0, (s, r) => s + r.maxCapacity);
+    final taken = _rooms.fold<int>(0, (s, r) => s + r.currentOccupancy);
+    final rooms = _visibleRooms(myRoom?.roomId);
 
     return Scaffold(
       appBar: AppBar(
@@ -154,7 +191,7 @@ class _RoomsScreenState extends State<RoomsScreen> {
             ? [
                 IconButton(
                   onPressed: () => _openAssignSheet(),
-                  icon: const Icon(Icons.meeting_room_outlined),
+                  icon: const Icon(Icons.person_add_alt_1_outlined),
                   tooltip: 'Assign resident',
                 ),
                 IconButton(
@@ -166,25 +203,239 @@ class _RoomsScreenState extends State<RoomsScreen> {
             : null,
       ),
       body: _loading
-          ? const AppLoadingView()
-          : RefreshIndicator(
-              onRefresh: _loadAll,
+          ? const AppLoadingView(message: 'Loading rooms…')
+          : AppRefreshIndicator(
+              onRefresh: () => _loadAll(showLoading: false),
               child: ListView(
-                padding: const EdgeInsets.all(16),
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
                 children: [
+                  const PageHeading(
+                    eyebrow: 'Residence',
+                    title: 'Rooms',
+                    subtitle: 'Who lives where, and where there\'s space',
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      _summaryTile(
+                        colors,
+                        Icons.door_front_door_outlined,
+                        '${_rooms.length}',
+                        'Rooms',
+                      ),
+                      const SizedBox(width: 8),
+                      _summaryTile(
+                        colors,
+                        Icons.bed_outlined,
+                        '${(beds - taken).clamp(0, beds)}',
+                        'Beds free',
+                      ),
+                      const SizedBox(width: 8),
+                      _summaryTile(
+                        colors,
+                        Icons.groups_2_outlined,
+                        '$taken',
+                        'Residents',
+                      ),
+                    ],
+                  ),
+                  if (myRoom != null) ...[
+                    const SizedBox(height: 14),
+                    _myRoomCard(myRoom),
+                  ],
                   if (isStaff && _unassigned.isNotEmpty) ...[
+                    const SizedBox(height: 14),
                     _buildUnassignedBanner(colors),
-                    const SizedBox(height: 16),
+                  ],
+                  const SizedBox(height: 16),
+                  if (_rooms.length > 3) ...[
+                    TextField(
+                      onChanged: (v) => setState(() => _roomSearch = v),
+                      decoration: InputDecoration(
+                        hintText: 'Search a room or a resident…',
+                        prefixIcon: Icon(
+                          Icons.search,
+                          size: 19,
+                          color: colors.onSurfaceVariant,
+                        ),
+                        filled: true,
+                        fillColor: colors.surface,
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 12,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.md),
+                          borderSide: BorderSide(color: colors.outlineVariant),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.md),
+                          borderSide: BorderSide(color: colors.outlineVariant),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.md),
+                          borderSide: const BorderSide(
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        for (final (k, l) in [
+                          ('all', 'All'),
+                          ('space', 'Has space'),
+                          ('full', 'Full'),
+                        ])
+                          ChoiceChip(
+                            label: Text(l),
+                            selected: _roomFilter == k,
+                            onSelected: (_) => setState(() => _roomFilter = k),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
                   ],
                   if (_rooms.isEmpty)
                     _buildEmptyState(colors, isStaff)
+                  else if (rooms.isEmpty)
+                    const EmptyState(
+                      icon: Icons.search_off_rounded,
+                      title: 'No rooms match',
+                      message: 'Try another search or filter.',
+                    )
                   else
-                    ..._rooms.map(
-                      (room) => _buildRoomCard(context, colors, isStaff, room),
+                    ...rooms.map(
+                      (room) => _buildRoomCard(
+                        context,
+                        colors,
+                        isStaff,
+                        room,
+                        mine: room.roomId == myRoom?.roomId,
+                      ),
                     ),
                 ],
               ),
             ),
+    );
+  }
+
+  Widget _summaryTile(
+    ColorScheme colors,
+    IconData icon,
+    String value,
+    String label,
+  ) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: colors.surface,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: colors.outlineVariant),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: 18, color: AppColors.primary),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: colors.onSurface,
+              ),
+            ),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 11.5, color: colors.onSurfaceVariant),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _myRoomCard(Room room) {
+    final mates = _occupantsOf(room.roomId)
+        .where((o) => o.userId != context.read<AuthProvider>().user?.userId)
+        .toList();
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.ink, Color(0xFF2A160B), AppColors.primaryDeep],
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(AppRadius.md),
+            ),
+            alignment: Alignment.center,
+            child: FittedBox(
+              child: Padding(
+                padding: const EdgeInsets.all(6),
+                child: Text(
+                  room.roomNumber,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.ink,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'YOUR ROOM',
+                  style: TextStyle(
+                    color: AppColors.primaryBorder,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.9,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Room ${room.roomNumber}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  mates.isEmpty
+                      ? 'Just you for now'
+                      : 'With ${mates.map((m) => m.displayName.split(' ').first).join(', ')}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white70, fontSize: 12.5),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -193,55 +444,62 @@ class _RoomsScreenState extends State<RoomsScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: _amber.withValues(alpha: 0.1),
+        color: colors.primaryContainer,
         borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: _amber.withValues(alpha: 0.3)),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.4)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.people_outline, size: 16, color: _amber),
-              const SizedBox(width: 6),
-              Text(
-                'Unassigned residents (${_unassigned.length})',
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: _amber,
+              const Icon(
+                Icons.person_search_outlined,
+                size: 18,
+                color: AppColors.primary,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '${_unassigned.length} resident${_unassigned.length == 1 ? '' : 's'} without a room',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w800,
+                    color: colors.onSurface,
+                  ),
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Tap a name to give them a room.',
+            style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
           ),
           const SizedBox(height: 10),
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: _unassigned.map((r) {
-              return GestureDetector(
-                onTap: () => _openAssignSheet(userId: r.userId),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: colors.surface,
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: _amber.withValues(alpha: 0.4)),
-                  ),
-                  child: Text(
-                    r.displayName,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: _amber,
+            children: [
+              for (final r in _unassigned)
+                ActionChip(
+                  avatar: CircleAvatar(
+                    backgroundColor: AppColors.primary,
+                    child: Text(
+                      r.displayName.isNotEmpty
+                          ? r.displayName[0].toUpperCase()
+                          : '?',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
+                  label: Text(r.displayName),
+                  onPressed: () => _openAssignSheet(userId: r.userId),
                 ),
-              );
-            }).toList(),
+            ],
           ),
         ],
       ),
@@ -249,85 +507,134 @@ class _RoomsScreenState extends State<RoomsScreen> {
   }
 
   Widget _buildEmptyState(ColorScheme colors, bool isStaff) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 48),
-      child: Column(
-        children: [
-          Icon(Icons.home_outlined, size: 32, color: colors.onSurfaceVariant),
-          const SizedBox(height: 10),
-          Text(
-            'No rooms yet',
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              color: colors.onSurface,
-            ),
-          ),
-          if (isStaff) ...[
-            const SizedBox(height: 4),
-            Text(
-              'Use "New room" to add the first one.',
-              style: TextStyle(fontSize: 12.5, color: colors.onSurfaceVariant),
-            ),
-          ],
-        ],
-      ),
+    return EmptyState(
+      icon: Icons.door_front_door_outlined,
+      title: 'No rooms yet',
+      message: isStaff
+          ? 'Tap + to add the first room.'
+          : 'Rooms will show here once they\'re set up.',
     );
   }
 
-  /// The "trunk" — a room card, with its occupants branching off it below.
+  /// Room card: number tile, a bed per place (filled = taken), occupants.
   Widget _buildRoomCard(
     BuildContext context,
     ColorScheme colors,
     bool isStaff,
-    Room room,
-  ) {
+    Room room, {
+    bool mine = false,
+  }) {
     final occupants = _occupantsOf(room.roomId);
     final full = room.currentOccupancy >= room.maxCapacity;
+    final free = (room.maxCapacity - room.currentOccupancy).clamp(
+      0,
+      room.maxCapacity,
+    );
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: colors.surface,
         borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: colors.outlineVariant),
+        border: Border.all(
+          color: mine ? AppColors.primary : colors.outlineVariant,
+          width: mine ? 1.4 : 1,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // --- trunk ---
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: full
+                      ? colors.surfaceContainerHighest
+                      : colors.primaryContainer,
+                  borderRadius: BorderRadius.circular(AppRadius.sm + 2),
+                ),
+                alignment: Alignment.center,
+                child: FittedBox(
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: Text(
+                      room.roomNumber,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: full
+                            ? colors.onSurfaceVariant
+                            : AppColors.primary,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Room ${room.roomNumber}',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
-                        color: colors.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: (full ? _red : _green).withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        '${room.currentOccupancy}/${room.maxCapacity} occupied',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: full ? _red : _green,
+                    Row(
+                      children: [
+                        Text(
+                          'Room ${room.roomNumber}',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: colors.onSurface,
+                          ),
                         ),
+                        if (mine) ...[
+                          const SizedBox(width: 6),
+                          const Text(
+                            '· YOURS',
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.primary,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 5),
+                    // One bed icon per place: filled = taken, outline = free.
+                    Semantics(
+                      label:
+                          '${room.currentOccupancy} of ${room.maxCapacity} beds taken',
+                      child: Wrap(
+                        spacing: 3,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          for (
+                            var i = 0;
+                            i < room.maxCapacity.clamp(0, 12);
+                            i++
+                          )
+                            Icon(
+                              i < room.currentOccupancy
+                                  ? Icons.bed_rounded
+                                  : Icons.bed_outlined,
+                              size: 17,
+                              color: i < room.currentOccupancy
+                                  ? AppColors.primary
+                                  : colors.outlineVariant,
+                            ),
+                          const SizedBox(width: 4),
+                          Text(
+                            full ? 'Full' : '$free free',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: colors.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -336,73 +643,55 @@ class _RoomsScreenState extends State<RoomsScreen> {
               if (isStaff && !full)
                 IconButton(
                   onPressed: () => _openAssignSheet(roomId: room.roomId),
-                  icon: Icon(
+                  icon: const Icon(
                     Icons.person_add_alt_1_outlined,
-                    size: 19,
-                    color: colors.onSurfaceVariant,
+                    size: 20,
+                    color: AppColors.primary,
                   ),
                   tooltip: 'Assign someone here',
                 ),
             ],
           ),
-
-          // --- branches ---
-          if (occupants.isEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 10),
-              child: Text(
-                'Empty',
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontStyle: FontStyle.italic,
-                  color: colors.onSurfaceVariant,
-                ),
-              ),
-            )
-          else ...[
-            const SizedBox(height: 12),
-            ...occupants.map(
-              (o) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
+          if (occupants.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Divider(height: 1, color: colors.outlineVariant),
+            const SizedBox(height: 6),
+            for (final o in occupants)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3),
                 child: Row(
                   children: [
-                    // the little branch connector
-                    SizedBox(
-                      width: 18,
-                      child: CustomPaint(
-                        painter: _BranchPainter(color: colors.outlineVariant),
-                      ),
-                    ),
                     CircleAvatar(
-                      radius: 12,
-                      backgroundColor: AppColors.primary,
+                      radius: 14,
+                      backgroundColor: colors.primaryContainer,
                       child: Text(
                         o.displayName.isNotEmpty
                             ? o.displayName[0].toUpperCase()
                             : '?',
                         style: const TextStyle(
-                          fontSize: 10,
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 11.5,
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         o.displayName,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 13.5,
                           color: colors.onSurface,
+                          fontWeight: FontWeight.w600,
                         ),
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     if (isStaff)
                       _busyResidentId == o.residentId
                           ? SizedBox(
-                              width: 16,
-                              height: 16,
+                              width: 18,
+                              height: 18,
                               child: AppLoader(
                                 strokeWidth: 2,
                                 color: colors.onSurfaceVariant,
@@ -412,44 +701,20 @@ class _RoomsScreenState extends State<RoomsScreen> {
                               onPressed: () => _confirmRemove(o),
                               icon: Icon(
                                 Icons.person_remove_outlined,
-                                size: 17,
+                                size: 18,
                                 color: colors.onSurfaceVariant,
                               ),
                               visualDensity: VisualDensity.compact,
-                              tooltip: 'Remove from room',
+                              tooltip: 'Move out of this room',
                             ),
                   ],
                 ),
               ),
-            ),
           ],
         ],
       ),
     );
   }
-}
-
-/// Draws a small "└" branch connector to the left of each occupant row.
-class _BranchPainter extends CustomPainter {
-  final Color color;
-  _BranchPainter({required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = 1.5
-      ..style = PaintingStyle.stroke;
-    final path = Path()
-      ..moveTo(size.width / 2, -8)
-      ..lineTo(size.width / 2, size.height / 2)
-      ..lineTo(size.width, size.height / 2);
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _BranchPainter oldDelegate) =>
-      oldDelegate.color != color;
 }
 
 /// --- New room sheet ---

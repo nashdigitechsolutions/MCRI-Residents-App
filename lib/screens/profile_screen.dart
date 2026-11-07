@@ -1,5 +1,7 @@
 import 'package:intl/intl.dart';
 
+import '../widgets/app_refresh.dart';
+
 import '../widgets/ui.dart';
 import '../navigation/app_navigator.dart';
 
@@ -311,7 +313,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     return Scaffold(
-      body: RefreshIndicator(
+      body: AppRefreshIndicator(
         onRefresh: _loadFromServer,
         child: ListView(
           padding: EdgeInsets.zero,

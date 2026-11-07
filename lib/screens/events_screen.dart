@@ -1,4 +1,7 @@
 import 'package:mcri_residents_app/widgets/app_loader.dart';
+
+import '../widgets/app_refresh.dart';
+
 import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -10,6 +13,7 @@ import '../models/event.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../utils/google_calendar.dart';
+import '../widgets/ui.dart';
 
 const _red = AppColors.danger;
 const _accent = AppColors.primary;
@@ -42,10 +46,11 @@ class _EventsScreenState extends State<EventsScreen> {
     _loadEvents();
   }
 
-  Future<void> _loadEvents() async {
-    setState(() => _loading = true);
+  Future<void> _loadEvents({bool showLoading = true}) async {
+    if (showLoading) setState(() => _loading = true);
     try {
       final data = await ApiService.get('/events');
+      if (!mounted) return;
       setState(() {
         _events = (data as List)
             .map((j) => Event.fromJson(j as Map<String, dynamic>))
@@ -257,176 +262,454 @@ class _EventsScreenState extends State<EventsScreen> {
     }
   }
 
+  // ── View state for the redesigned screen ──
+  String _filter = 'upcoming'; // upcoming | going | past
+  bool _calendar = false;
+
+  List<Event> get _past {
+    final now = DateTime.now();
+    final q = _search.toLowerCase();
+    return _events
+        .where((e) => !e.endDate.isAfter(now))
+        .where(
+          (e) =>
+              q.isEmpty ||
+              e.title.toLowerCase().contains(q) ||
+              (e.location ?? '').toLowerCase().contains(q),
+        )
+        .toList()
+      ..sort((a, b) => b.startDate.compareTo(a.startDate));
+  }
+
+  List<Event> get _visible => switch (_filter) {
+    'going' =>
+      _upcoming
+          .where((e) => e.myAttendanceStatus == AttendanceStatus.going)
+          .toList(),
+    'past' => _past,
+    _ => _upcoming,
+  };
+
+  String _countdown(Event e) {
+    final now = DateTime.now();
+    if (!e.startDate.isAfter(now)) return 'Happening now';
+    final days = _dateOnly(e.startDate).difference(_dateOnly(now)).inDays;
+    final time = DateFormat.jm().format(e.startDate);
+    if (days == 0) {
+      final mins = e.startDate.difference(now).inMinutes;
+      return mins < 60 ? 'Starts in $mins min' : 'Today · $time';
+    }
+    if (days == 1) return 'Tomorrow · $time';
+    if (days < 7) return '${DateFormat.EEEE().format(e.startDate)} · $time';
+    return 'In $days days · ${DateFormat.MMMd().format(e.startDate)}';
+  }
+
+  /// Splits a list into labelled groups: Today, This week, Later (or by month for past).
+  List<(String, List<Event>)> _grouped(List<Event> list) {
+    final today = _dateOnly(DateTime.now());
+    final groups = <String, List<Event>>{};
+    for (final e in list) {
+      final d = _dateOnly(e.startDate);
+      final diff = d.difference(today).inDays;
+      final label = _filter == 'past'
+          ? DateFormat.yMMMM().format(e.startDate)
+          : diff <= 0
+          ? 'Today'
+          : diff < 7
+          ? 'This week'
+          : diff < 31
+          ? 'This month'
+          : 'Later';
+      (groups[label] ??= []).add(e);
+    }
+    return groups.entries.map((g) => (g.key, g.value)).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final upcoming = _upcoming;
+    final next = _search.isEmpty && upcoming.isNotEmpty ? upcoming.first : null;
+    final going = _events
+        .where(
+          (e) =>
+              e.endDate.isAfter(DateTime.now()) &&
+              e.myAttendanceStatus == AttendanceStatus.going,
+        )
+        .length;
+    final list = _visible
+        .where((e) => _filter != 'upcoming' || e != next)
+        .toList();
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Events'),
         actions: [
           IconButton(
+            tooltip: _calendar ? 'List view' : 'Calendar view',
+            onPressed: () => setState(() => _calendar = !_calendar),
+            icon: Icon(
+              _calendar
+                  ? Icons.view_agenda_outlined
+                  : Icons.calendar_month_outlined,
+            ),
+          ),
+          IconButton(
+            tooltip: 'New event',
             onPressed: () => _openNewEventSheet(defaultDate: DateTime.now()),
             icon: const Icon(Icons.add),
           ),
         ],
       ),
       body: _loading
-          ? const AppLoadingView()
-          : RefreshIndicator(
-              onRefresh: _loadEvents,
+          ? const AppLoadingView(message: 'Loading events…')
+          : AppRefreshIndicator(
+              onRefresh: () => _loadEvents(showLoading: false),
               child: ListView(
-                padding: const EdgeInsets.all(16),
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
                 children: [
-                  // --- month navigation ---
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // AnimatedSwitcher: whenever the child widget's key changes,
-                      // the old one fades out while the new one fades in — a tiny,
-                      // low-level animation with no manual controller needed.
-                      Expanded(
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 200),
-                              child: Text(
-                                DateFormat.yMMMM().format(_month),
-                                key: ValueKey(_month),
-                                maxLines: 1,
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: colors.onSurface,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            onPressed: () => setState(
-                              () => _month = DateTime(
-                                _month.year,
-                                _month.month - 1,
-                              ),
-                            ),
-                            icon: Icon(
-                              Icons.chevron_left,
-                              color: colors.onSurfaceVariant,
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: () => setState(
-                              () => _month = DateTime(
-                                DateTime.now().year,
-                                DateTime.now().month,
-                              ),
-                            ),
-                            child: const Text(
-                              'Today',
-                              style: TextStyle(fontSize: 12.5),
-                            ),
-                          ),
-                          IconButton(
-                            onPressed: () => setState(
-                              () => _month = DateTime(
-                                _month.year,
-                                _month.month + 1,
-                              ),
-                            ),
-                            icon: Icon(
-                              Icons.chevron_right,
-                              color: colors.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                  PageHeading(
+                    eyebrow: 'Community',
+                    title: 'What\'s on',
+                    subtitle: upcoming.isEmpty
+                        ? 'Nothing planned yet'
+                        : '${upcoming.length} upcoming · you\'re going to $going',
                   ),
-                  const SizedBox(height: 10),
-
-                  _MonthGrid(
-                    month: _month,
-                    eventsOn: _eventsOn,
-                    onSelectDay: _openDayAgenda,
-                    onLongPressEvent: _openActionSheet,
-                  ),
-
-                  const SizedBox(height: 20),
-                  Text(
-                    'Search',
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w600,
-                      color: colors.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  TextField(
-                    onChanged: (v) => setState(() => _search = v),
-                    decoration: InputDecoration(
-                      hintText: 'Search upcoming events…',
-                      prefixIcon: Icon(
-                        Icons.search,
-                        size: 19,
-                        color: colors.onSurfaceVariant,
-                      ),
-                      filled: true,
-                      fillColor: colors.surface,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(999),
-                        borderSide: BorderSide(color: colors.outlineVariant),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(999),
-                        borderSide: BorderSide(color: colors.outlineVariant),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(999),
-                        borderSide: const BorderSide(color: _accent),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 18),
-                  if (_upcoming.isNotEmpty) ...[
-                    Text(
-                      'Upcoming',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: colors.onSurfaceVariant,
-                      ),
-                    ),
+                  const SizedBox(height: 16),
+                  if (_calendar) ...[
+                    _monthHeader(colors),
                     const SizedBox(height: 10),
-                    for (final e in _upcoming.take(8))
-                      _UpcomingRow(
-                        event: e,
-                        onTap: () => _openEventDetail(e),
-                        onMore: () => _openActionSheet(e),
+                    _MonthGrid(
+                      month: _month,
+                      eventsOn: _eventsOn,
+                      onSelectDay: _openDayAgenda,
+                      onLongPressEvent: _openActionSheet,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Tap a day to see its events · long-press an event for options',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: colors.onSurfaceVariant,
                       ),
-                  ] else if (_search.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 24),
-                      child: Center(
-                        child: Text(
-                          'No matching events',
-                          style: TextStyle(color: colors.onSurfaceVariant),
+                    ),
+                  ] else ...[
+                    if (next != null) ...[
+                      _nextUpCard(next),
+                      const SizedBox(height: 16),
+                    ],
+                    TextField(
+                      onChanged: (v) => setState(() => _search = v),
+                      decoration: InputDecoration(
+                        hintText: 'Search events or places…',
+                        prefixIcon: Icon(
+                          Icons.search,
+                          size: 19,
+                          color: colors.onSurfaceVariant,
+                        ),
+                        filled: true,
+                        fillColor: colors.surface,
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 12,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.md),
+                          borderSide: BorderSide(color: colors.outlineVariant),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.md),
+                          borderSide: BorderSide(color: colors.outlineVariant),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.md),
+                          borderSide: const BorderSide(color: _accent),
                         ),
                       ),
                     ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        for (final (key, label) in [
+                          ('upcoming', 'Upcoming'),
+                          ('going', 'I\'m going'),
+                          ('past', 'Past'),
+                        ])
+                          ChoiceChip(
+                            label: Text(label),
+                            selected: _filter == key,
+                            onSelected: (_) => setState(() => _filter = key),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    if (list.isEmpty)
+                      EmptyState(
+                        icon: _filter == 'going'
+                            ? Icons.event_available_outlined
+                            : Icons.event_busy_outlined,
+                        title: _search.isNotEmpty
+                            ? 'No matching events'
+                            : switch (_filter) {
+                                'going' => 'No RSVPs yet',
+                                'past' => 'No past events',
+                                _ =>
+                                  next != null
+                                      ? 'That\'s everything for now'
+                                      : 'No upcoming events',
+                              },
+                        message: _filter == 'going'
+                            ? 'Tap "Going" on an event and it shows up here.'
+                            : 'Tap + to plan something for the house.',
+                      )
+                    else
+                      for (final (label, events) in _grouped(list)) ...[
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(2, 14, 2, 8),
+                          child: Text(
+                            label.toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.8,
+                              color: colors.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                        for (final e in events)
+                          Opacity(
+                            opacity: _filter == 'past' ? 0.7 : 1,
+                            child: _UpcomingRow(
+                              event: e,
+                              onTap: () => _openEventDetail(e),
+                              onMore: () => _openActionSheet(e),
+                            ),
+                          ),
+                      ],
+                  ],
                 ],
               ),
             ),
     );
   }
+
+  Widget _monthHeader(ColorScheme colors) {
+    return Row(
+      children: [
+        Expanded(
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            child: Text(
+              DateFormat.yMMMM().format(_month),
+              key: ValueKey(_month),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: colors.onSurface,
+              ),
+            ),
+          ),
+        ),
+        IconButton(
+          tooltip: 'Previous month',
+          onPressed: () =>
+              setState(() => _month = DateTime(_month.year, _month.month - 1)),
+          icon: Icon(Icons.chevron_left, color: colors.onSurfaceVariant),
+        ),
+        TextButton(
+          onPressed: () => setState(
+            () => _month = DateTime(DateTime.now().year, DateTime.now().month),
+          ),
+          child: const Text('Today'),
+        ),
+        IconButton(
+          tooltip: 'Next month',
+          onPressed: () =>
+              setState(() => _month = DateTime(_month.year, _month.month + 1)),
+          icon: Icon(Icons.chevron_right, color: colors.onSurfaceVariant),
+        ),
+      ],
+    );
+  }
+
+  /// Featured card for the very next event, with a countdown and one-tap RSVP.
+  Widget _nextUpCard(Event e) {
+    final going = e.myAttendanceStatus == AttendanceStatus.going;
+    return Material(
+      color: Colors.transparent,
+      child: Ink(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [AppColors.ink, Color(0xFF2A160B), AppColors.primaryDeep],
+          ),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          onTap: () => _openEventDetail(e),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 9,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.22),
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                      ),
+                      child: Text(
+                        _countdown(e).toUpperCase(),
+                        style: const TextStyle(
+                          color: AppColors.primaryBorder,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.6,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    const Text(
+                      'NEXT UP',
+                      style: TextStyle(
+                        color: Colors.white54,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 54,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            DateFormat.MMM().format(e.startDate).toUpperCase(),
+                            style: const TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          Text(
+                            '${e.startDate.day}',
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.ink,
+                              height: 1.1,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            e.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              height: 1.2,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          _heroMeta(
+                            Icons.schedule_rounded,
+                            '${DateFormat.jm().format(e.startDate)} – ${DateFormat.jm().format(e.endDate)}',
+                          ),
+                          if ((e.location ?? '').isNotEmpty)
+                            _heroMeta(Icons.place_outlined, e.location!),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: going ? null : () => _rsvp(e, 'going'),
+                        style: FilledButton.styleFrom(
+                          disabledBackgroundColor: Colors.white.withValues(
+                            alpha: 0.14,
+                          ),
+                          disabledForegroundColor: Colors.white,
+                        ),
+                        icon: Icon(
+                          going
+                              ? Icons.check_circle_rounded
+                              : Icons.event_available_rounded,
+                          size: 18,
+                        ),
+                        label: Text(going ? 'You\'re going' : 'I\'m going'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    OutlinedButton(
+                      onPressed: () => _openEventDetail(e),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.35),
+                        ),
+                      ),
+                      child: const Text('Details'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _heroMeta(IconData icon, String text) => Padding(
+    padding: const EdgeInsets.only(top: 3),
+    child: Row(
+      children: [
+        Icon(icon, size: 14, color: Colors.white60),
+        const SizedBox(width: 5),
+        Expanded(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Colors.white70, fontSize: 12.5),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 /// --- Month grid ---

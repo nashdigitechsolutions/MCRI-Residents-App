@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import '../widgets/app_refresh.dart';
+
 import 'package:mcri_residents_app/widgets/app_loader.dart';
 import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
@@ -241,7 +243,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
         children: [
           _loading
               ? const AppLoadingView()
-              : RefreshIndicator(
+              : AppRefreshIndicator(
                   onRefresh: () => _fetch(showLoading: false),
                   child: ListView(
                     padding: EdgeInsets.fromLTRB(

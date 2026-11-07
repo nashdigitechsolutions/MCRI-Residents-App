@@ -1,4 +1,7 @@
 import 'package:mcri_residents_app/widgets/app_loader.dart';
+
+import '../widgets/app_refresh.dart';
+
 import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -121,7 +124,7 @@ class _PollsScreenState extends State<PollsScreen> with LiveRefresh {
       ),
       body: _loading
           ? const AppLoadingView()
-          : RefreshIndicator(
+          : AppRefreshIndicator(
               onRefresh: () => _fetchPolls(showLoading: false),
               child: ListView(
                 padding: const EdgeInsets.all(16),

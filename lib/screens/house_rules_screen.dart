@@ -1,4 +1,7 @@
 import 'package:mcri_residents_app/widgets/app_loader.dart';
+
+import '../widgets/app_refresh.dart';
+
 import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -6,6 +9,8 @@ import 'package:provider/provider.dart';
 import '../models/house_rule.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
+import '../services/storage_service.dart';
+import '../widgets/ui.dart';
 
 const _red = AppColors.danger;
 const _accent = AppColors.primary;
@@ -27,12 +32,14 @@ class _HouseRulesScreenState extends State<HouseRulesScreen> {
   void initState() {
     super.initState();
     _fetchRules();
+    _loadRead();
   }
 
   Future<void> _fetchRules({bool showLoading = true}) async {
     if (showLoading) setState(() => _loading = true);
     try {
       final data = await ApiService.get('/house-rules');
+      if (!mounted) return;
       setState(() {
         _rules = (data as List)
             .map((j) => HouseRule.fromJson(j as Map<String, dynamic>))
@@ -111,85 +118,79 @@ class _HouseRulesScreenState extends State<HouseRulesScreen> {
     }
   }
 
+  // Rules this device has opened (kept locally so the progress survives restarts).
+  static const _readKey = 'house_rules_read_v1';
+  Set<int> _read = {};
+  bool _expandAll = false;
+
+  Future<void> _loadRead() async {
+    try {
+      final raw = await StorageService.getItem(_readKey);
+      if (raw == null || !mounted) return;
+      setState(
+        () => _read = raw.split(',').map(int.tryParse).whereType<int>().toSet(),
+      );
+    } catch (_) {}
+  }
+
+  void _markRead(Iterable<int> ids) {
+    final before = _read.length;
+    _read = {..._read, ...ids};
+    if (_read.length != before) {
+      StorageService.setItem(_readKey, _read.join(',')).catchError((_) {});
+    }
+  }
+
+  void _toggle(HouseRule r) {
+    setState(() {
+      _openId = _openId == r.ruleId ? null : r.ruleId;
+      _markRead([r.ruleId]);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final isAdmin = context.watch<AuthProvider>().user?.roleId == 1;
-    final colors = Theme.of(context).colorScheme;
     final rules = _filtered;
+    final readCount = _rules.where((r) => _read.contains(r.ruleId)).length;
+    final allRead = _rules.isNotEmpty && readCount == _rules.length;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('House rules'),
-        actions: isAdmin
-            ? [
-                IconButton(
-                  onPressed: () => _openForm(),
-                  icon: const Icon(Icons.add),
-                ),
-              ]
-            : null,
+        actions: [
+          if (_rules.isNotEmpty)
+            IconButton(
+              tooltip: _expandAll ? 'Collapse all' : 'Expand all',
+              icon: Icon(
+                _expandAll
+                    ? Icons.unfold_less_rounded
+                    : Icons.unfold_more_rounded,
+              ),
+              onPressed: () => setState(() {
+                _expandAll = !_expandAll;
+                _openId = null;
+                if (_expandAll) _markRead(_rules.map((r) => r.ruleId));
+              }),
+            ),
+          if (isAdmin)
+            IconButton(
+              tooltip: 'Add rule',
+              onPressed: () => _openForm(),
+              icon: const Icon(Icons.add),
+            ),
+        ],
       ),
       body: _loading
-          ? const AppLoadingView()
-          : RefreshIndicator(
+          ? const AppLoadingView(message: 'Loading house rules…')
+          : AppRefreshIndicator(
               onRefresh: () => _fetchRules(showLoading: false),
               child: ListView(
-                padding: const EdgeInsets.all(16),
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
                 children: [
-                  // --- energetic header strip ---
-                  Container(
-                    padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [_accent, _accent.withValues(alpha: 0.75)],
-                      ),
-                      borderRadius: BorderRadius.circular(AppRadius.md),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          height: 44,
-                          width: 44,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.18),
-                            borderRadius: BorderRadius.circular(AppRadius.md),
-                          ),
-                          child: const Icon(
-                            Icons.menu_book_rounded,
-                            color: Colors.white,
-                            size: 22,
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'House rules',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              Text(
-                                '${_rules.length} rule${_rules.length == 1 ? '' : 's'} keeping the house running smoothly',
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 11.5,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  _hero(readCount, allRead),
                   const SizedBox(height: 16),
-
                   if (_rules.length > 4) ...[
                     _SearchField(
                       value: _search,
@@ -197,80 +198,165 @@ class _HouseRulesScreenState extends State<HouseRulesScreen> {
                     ),
                     const SizedBox(height: 14),
                   ],
-
-                  Container(
-                    decoration: BoxDecoration(
-                      color: colors.surface,
-                      borderRadius: BorderRadius.circular(AppRadius.md),
-                      border: Border.all(color: colors.outlineVariant),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: rules.isEmpty
-                        ? Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 40),
-                            child: Column(
-                              children: [
-                                Icon(
-                                  Icons.menu_book_outlined,
-                                  size: 30,
-                                  color: colors.onSurfaceVariant,
-                                ),
-                                const SizedBox(height: 10),
-                                Text(
-                                  _search.isNotEmpty
-                                      ? 'No matches'
-                                      : 'No rules set yet',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    color: colors.onSurface,
-                                  ),
-                                ),
-                                if (_search.isNotEmpty) ...[
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Try a different search term.',
-                                    style: TextStyle(
-                                      fontSize: 12.5,
-                                      color: colors.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          )
-                        : Material(
-                            color: colors.surface,
-                            child: Column(
-                              children: [
-                                for (var i = 0; i < rules.length; i++) ...[
-                                  _RuleRow(
-                                    index: i,
-                                    rule: rules[i],
-                                    isOpen: _openId == rules[i].ruleId,
-                                    isAdmin: isAdmin,
-                                    onTap: () => setState(
-                                      () => _openId = _openId == rules[i].ruleId
-                                          ? null
-                                          : rules[i].ruleId,
-                                    ),
-                                    onEdit: () => _openForm(rule: rules[i]),
-                                    onDelete: () => _deleteRule(rules[i]),
-                                  ),
-                                  if (i < rules.length - 1)
-                                    Divider(
-                                      height: 1,
-                                      color: colors.outlineVariant,
-                                    ),
-                                ],
-                              ],
-                            ),
-                          ),
-                  ),
+                  if (rules.isEmpty)
+                    EmptyState(
+                      icon: Icons.menu_book_outlined,
+                      title: _search.isNotEmpty
+                          ? 'No matches'
+                          : 'No rules set yet',
+                      message: _search.isNotEmpty
+                          ? 'Try a different search term.'
+                          : isAdmin
+                          ? 'Tap + to add the first house rule.'
+                          : 'The lodge manager hasn\'t added any rules yet.',
+                    )
+                  else
+                    for (var i = 0; i < rules.length; i++)
+                      _RuleRow(
+                        index: _rules.indexOf(rules[i]),
+                        rule: rules[i],
+                        isOpen: _expandAll || _openId == rules[i].ruleId,
+                        isRead: _read.contains(rules[i].ruleId),
+                        isAdmin: isAdmin,
+                        onTap: () => _toggle(rules[i]),
+                        onEdit: () => _openForm(rule: rules[i]),
+                        onDelete: () => _deleteRule(rules[i]),
+                      ),
                 ],
               ),
             ),
     );
   }
+
+  Widget _hero(int readCount, bool allRead) {
+    final total = _rules.length;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.ink, Color(0xFF2A160B), AppColors.primaryDeep],
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                ),
+                child: Icon(
+                  allRead ? Icons.verified_rounded : Icons.menu_book_rounded,
+                  color: AppColors.primaryBorder,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'LIVING TOGETHER',
+                      style: TextStyle(
+                        color: AppColors.primaryBorder,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.9,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      total == 0
+                          ? 'House rules'
+                          : '$total rule${total == 1 ? '' : 's'} for a happy house',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (total > 0) ...[
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: readCount / total,
+                      minHeight: 8,
+                      color: AppColors.primary,
+                      backgroundColor: Colors.white.withValues(alpha: 0.14),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  allRead ? 'All read' : '$readCount of $total read',
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            if (!allRead) ...[
+              const SizedBox(height: 10),
+              Text(
+                'Tap a rule to read it. Everyone in the house agrees to these.',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.6),
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Picks an icon from the rule's wording so the list scans at a glance.
+IconData _iconFor(HouseRule r) {
+  final t = '${r.title} ${r.description ?? ''}'.toLowerCase();
+  const table = <(List<String>, IconData)>[
+    (['quiet', 'noise', 'music', 'loud'], Icons.volume_off_outlined),
+    (['guest', 'visitor', 'visit'], Icons.group_outlined),
+    (['smok', 'vape', 'alcohol', 'drink'], Icons.smoke_free_outlined),
+    (['kitchen', 'cook', 'food', 'dish', 'fridge'], Icons.kitchen_outlined),
+    (
+      ['clean', 'tidy', 'trash', 'rubbish', 'bin', 'waste'],
+      Icons.cleaning_services_outlined,
+    ),
+    (['laundry', 'wash', 'cloth'], Icons.local_laundry_service_outlined),
+    (['pay', 'rent', 'fee', 'fine'], Icons.payments_outlined),
+    (['wifi', 'internet', 'network'], Icons.wifi_rounded),
+    (
+      ['safety', 'fire', 'lock', 'key', 'security', 'gate'],
+      Icons.shield_outlined,
+    ),
+    (['curfew', 'time', 'hour', 'night'], Icons.schedule_rounded),
+    (['water', 'electric', 'power', 'light'], Icons.bolt_outlined),
+    (['pet', 'animal'], Icons.pets_outlined),
+  ];
+  for (final (words, icon) in table) {
+    if (words.any(t.contains)) return icon;
+  }
+  return Icons.rule_rounded;
 }
 
 class _SearchField extends StatelessWidget {
@@ -282,6 +368,10 @@ class _SearchField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    OutlineInputBorder border(Color c) => OutlineInputBorder(
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      borderSide: BorderSide(color: c),
+    );
     return TextField(
       onChanged: onChanged,
       decoration: InputDecoration(
@@ -294,29 +384,20 @@ class _SearchField extends StatelessWidget {
         filled: true,
         fillColor: colors.surface,
         contentPadding: const EdgeInsets.symmetric(vertical: 12),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(999),
-          borderSide: BorderSide(color: colors.outlineVariant),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(999),
-          borderSide: BorderSide(color: colors.outlineVariant),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(999),
-          borderSide: const BorderSide(color: _accent),
-        ),
+        border: border(colors.outlineVariant),
+        enabledBorder: border(colors.outlineVariant),
+        focusedBorder: border(_accent),
       ),
     );
   }
 }
 
-/// A single accordion row — numbered badge, title, admin edit icon, chevron
-/// that flips, and a smooth expand/collapse for the description.
+/// One rule card: keyword icon, number, title, read tick, smooth expand.
 class _RuleRow extends StatelessWidget {
   final int index;
   final HouseRule rule;
   final bool isOpen;
+  final bool isRead;
   final bool isAdmin;
   final VoidCallback onTap;
   final VoidCallback onEdit;
@@ -326,6 +407,7 @@ class _RuleRow extends StatelessWidget {
     required this.index,
     required this.rule,
     required this.isOpen,
+    required this.isRead,
     required this.isAdmin,
     required this.onTap,
     required this.onEdit,
@@ -335,123 +417,149 @@ class _RuleRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-
-    return Column(
-      children: [
-        InkWell(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(
+          color: isOpen ? _accent : colors.outlineVariant,
+          width: isOpen ? 1.4 : 1,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppRadius.md),
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-            child: Row(
+            padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  height: 26,
-                  width: 26,
-                  decoration: BoxDecoration(
-                    color: isOpen ? _accent : colors.surfaceContainerHighest,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Center(
-                    child: Text(
-                      '${index + 1}',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: isOpen ? Colors.white : colors.onSurfaceVariant,
+                Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: isOpen ? _accent : colors.primaryContainer,
+                        borderRadius: BorderRadius.circular(AppRadius.sm + 2),
+                      ),
+                      child: Icon(
+                        _iconFor(rule),
+                        size: 20,
+                        color: isOpen ? Colors.white : _accent,
                       ),
                     ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    rule.title,
-                    style: TextStyle(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w600,
-                      color: colors.onSurface,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'RULE ${index + 1}',
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.6,
+                              color: colors.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(height: 1),
+                          Text(
+                            rule.title,
+                            style: TextStyle(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w700,
+                              color: colors.onSurface,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ),
-                if (isAdmin)
-                  GestureDetector(
-                    onTap: onEdit,
-                    child: Padding(
-                      padding: const EdgeInsets.all(6),
+                    if (isRead && !isOpen)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 2),
+                        child: Icon(
+                          Icons.check_circle_rounded,
+                          size: 17,
+                          color: colors.onSurfaceVariant.withValues(alpha: 0.6),
+                          semanticLabel: 'Read',
+                        ),
+                      ),
+                    AnimatedRotation(
+                      turns: isOpen ? 0.5 : 0,
+                      duration: const Duration(milliseconds: 250),
                       child: Icon(
-                        Icons.edit_outlined,
-                        size: 16,
+                        Icons.keyboard_arrow_down,
                         color: colors.onSurfaceVariant,
                       ),
                     ),
-                  ),
-                AnimatedRotation(
-                  turns: isOpen ? 0.5 : 0,
+                  ],
+                ),
+                AnimatedSize(
                   duration: const Duration(milliseconds: 250),
-                  child: Icon(
-                    Icons.keyboard_arrow_down,
-                    color: colors.onSurfaceVariant,
-                  ),
+                  curve: Curves.easeInOut,
+                  alignment: Alignment.topCenter,
+                  child: isOpen
+                      ? Padding(
+                          padding: const EdgeInsets.fromLTRB(52, 10, 6, 0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                rule.description?.isNotEmpty == true
+                                    ? rule.description!
+                                    : 'No additional details provided.',
+                                style: TextStyle(
+                                  fontSize: 13.5,
+                                  color: colors.onSurfaceVariant,
+                                  height: 1.55,
+                                ),
+                              ),
+                              if (isAdmin) ...[
+                                const SizedBox(height: 8),
+                                Wrap(
+                                  spacing: 4,
+                                  children: [
+                                    TextButton.icon(
+                                      onPressed: onEdit,
+                                      icon: const Icon(
+                                        Icons.edit_outlined,
+                                        size: 16,
+                                      ),
+                                      label: const Text('Edit'),
+                                    ),
+                                    TextButton.icon(
+                                      onPressed: onDelete,
+                                      style: TextButton.styleFrom(
+                                        foregroundColor: _red,
+                                      ),
+                                      icon: const Icon(
+                                        Icons.delete_outline,
+                                        size: 16,
+                                      ),
+                                      label: const Text('Delete'),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ],
+                          ),
+                        )
+                      : const SizedBox(width: double.infinity),
                 ),
               ],
             ),
           ),
         ),
-        AnimatedSize(
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeInOut,
-          child: isOpen
-              ? Padding(
-                  padding: const EdgeInsets.fromLTRB(56, 0, 18, 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        rule.description?.isNotEmpty == true
-                            ? rule.description!
-                            : 'No additional details provided.',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: colors.onSurfaceVariant,
-                          height: 1.5,
-                        ),
-                      ),
-                      if (isAdmin) ...[
-                        const SizedBox(height: 10),
-                        GestureDetector(
-                          onTap: onDelete,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.delete_outline,
-                                size: 14,
-                                color: _red,
-                              ),
-                              const SizedBox(width: 5),
-                              const Text(
-                                'Delete rule',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: _red,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                )
-              : const SizedBox(width: double.infinity),
-        ),
-      ],
+      ),
     );
   }
 }
 
-/// --- Create/edit rule sheet ---
 class _RuleFormSheet extends StatefulWidget {
   final HouseRule? rule;
   const _RuleFormSheet({this.rule});

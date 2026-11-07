@@ -1,6 +1,9 @@
 // ignore_for_file: unnecessary_underscores
 
 import 'package:mcri_residents_app/widgets/app_loader.dart';
+
+import '../widgets/app_refresh.dart';
+
 import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -175,7 +178,7 @@ class _WeeklyMenuScreenState extends State<WeeklyMenuScreen> {
           : null,
       body: _loading
           ? const AppLoadingView(message: 'Loading the menu…')
-          : RefreshIndicator(
+          : AppRefreshIndicator(
               onRefresh: () => _fetchMenu(showLoading: false),
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),

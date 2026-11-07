@@ -1,5 +1,7 @@
 import 'package:mcri_residents_app/widgets/app_loader.dart';
 
+import '../../widgets/app_refresh.dart';
+
 import '../weekly_menu_screen.dart';
 import '../duties_screen.dart';
 import '../equipment_screen.dart';
@@ -481,7 +483,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       ),
       body: _loading
           ? const AppLoadingView()
-          : RefreshIndicator(
+          : AppRefreshIndicator(
               onRefresh: () => _loadAll(showLoading: false),
               child: ListView(
                 padding: const EdgeInsets.all(16),

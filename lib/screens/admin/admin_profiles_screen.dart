@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+
+import '../../widgets/app_refresh.dart';
+
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -115,7 +118,7 @@ class _AdminProfilesScreenState extends State<AdminProfilesScreen> {
               actionLabel: 'Try again',
               onAction: _load,
             )
-          : RefreshIndicator(
+          : AppRefreshIndicator(
               onRefresh: _load,
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),

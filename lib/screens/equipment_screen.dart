@@ -1,4 +1,7 @@
 import 'package:mcri_residents_app/widgets/text_prompt_dialog.dart';
+
+import '../widgets/app_refresh.dart';
+
 import 'package:mcri_residents_app/widgets/app_loader.dart';
 import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
@@ -447,7 +450,7 @@ class _EquipmentScreenState extends State<EquipmentScreen> with LiveRefresh {
       ),
       body: _loading
           ? const AppLoadingView()
-          : RefreshIndicator(
+          : AppRefreshIndicator(
               onRefresh: _loadAll,
               child: ListView(
                 padding: const EdgeInsets.all(16),
