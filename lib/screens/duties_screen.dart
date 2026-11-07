@@ -10,6 +10,7 @@ import '../models/resident.dart';
 import '../models/roster_entry.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
+import '../widgets/ui.dart';
 
 const _red = AppColors.danger;
 const _accent = AppColors.primary;
@@ -281,16 +282,6 @@ class _DutiesScreenState extends State<DutiesScreen>
   int get _todayDayOfWeek =>
       DateTime.now().weekday; // 1=Monday..7=Sunday, matches backend
 
-  bool get _hasDutyDueToday {
-    final today = DateTime.now();
-    return _myUpcoming.any(
-      (d) =>
-          d.assignedDate.year == today.year &&
-          d.assignedDate.month == today.month &&
-          d.assignedDate.day == today.day,
-    );
-  }
-
   List<RosterEntry> get _filteredRoster {
     if (_genderTab == _GenderTab.all) return _roster;
     return _roster.where((r) {
@@ -350,9 +341,61 @@ class _DutiesScreenState extends State<DutiesScreen>
     }
   }
 
+  // ───────────────────────────── redesign ─────────────────────────────
+
+  int _selectedDay = DateTime.now().weekday;
+
+  bool _isToday(DateTime d) {
+    final n = DateTime.now();
+    return d.year == n.year && d.month == n.month && d.day == n.day;
+  }
+
+  bool _isOverdue(Duty d) {
+    final n = DateTime.now();
+    final today = DateTime(n.year, n.month, n.day);
+    return d.status != DutyStatus.completed &&
+        DateTime(
+          d.assignedDate.year,
+          d.assignedDate.month,
+          d.assignedDate.day,
+        ).isBefore(today);
+  }
+
+  static ({String label, Color color, IconData icon}) _meta(DutyStatus s) =>
+      switch (s) {
+        DutyStatus.pending => (
+          label: 'To do',
+          color: _amber,
+          icon: Icons.radio_button_unchecked_rounded,
+        ),
+        DutyStatus.inProgress => (
+          label: 'In progress',
+          color: _accent,
+          icon: Icons.timelapse_rounded,
+        ),
+        DutyStatus.completed => (
+          label: 'Done',
+          color: _green,
+          icon: Icons.check_circle_rounded,
+        ),
+        DutyStatus.missed => (
+          label: 'Missed',
+          color: _red,
+          icon: Icons.cancel_rounded,
+        ),
+      };
+
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final upcoming = _myUpcoming
+      ..sort((a, b) => a.assignedDate.compareTo(b.assignedDate));
+    final done = _myDone
+      ..sort((a, b) => b.assignedDate.compareTo(a.assignedDate));
+    final todayPeople = _roster
+        .where((r) => r.dayOfWeek == _todayDayOfWeek)
+        .toList();
+    final myToday = upcoming.where((d) => _isToday(d.assignedDate)).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -364,611 +407,726 @@ class _DutiesScreenState extends State<DutiesScreen>
                   icon: const Icon(Icons.person_add_alt_1_outlined),
                   tooltip: 'Add to roster',
                 ),
-                IconButton(
-                  onPressed: _openAssignSheet,
-                  icon: const Icon(Icons.add),
-                  tooltip: 'Assign duty',
-                ),
               ]
             : null,
       ),
+      floatingActionButton: _isAdmin
+          ? FloatingActionButton.extended(
+              onPressed: _openAssignSheet,
+              icon: const Icon(Icons.add_task_rounded),
+              label: const Text('Assign duty'),
+            )
+          : null,
       body: _loading
-          ? const AppLoadingView()
+          ? const AppLoadingView(message: 'Loading duties…')
           : RefreshIndicator(
               onRefresh: _loadAll,
               child: ListView(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
                 children: [
-                  if (_hasDutyDueToday) _buildTodayBanner(colors),
-                  if (_hasDutyDueToday) const SizedBox(height: 14),
+                  const PageHeading(
+                    eyebrow: 'Residence',
+                    title: 'Duties',
+                    subtitle: 'Your chores and this week\'s roster',
+                  ),
+                  const SizedBox(height: 16),
+                  _todayCard(colors, todayPeople, myToday),
+                  const SizedBox(height: 14),
+                  _statsRow(colors, upcoming, done),
+                  const SizedBox(height: 22),
 
-                  _sectionLabel(colors, Icons.checklist_outlined, 'My duties'),
-                  const SizedBox(height: 10),
-                  if (_myUpcoming.isEmpty)
-                    _emptyCard(colors, 'No duties assigned to you')
+                  // ── My duties ─────────────────────────────────────
+                  const SectionHeader('My duties'),
+                  if (upcoming.isEmpty)
+                    _emptyCard(
+                      colors,
+                      Icons.celebration_outlined,
+                      done.isEmpty
+                          ? 'No duties assigned to you'
+                          : 'All caught up — nice work!',
+                    )
                   else
-                    for (final duty in _myUpcoming)
-                      _MyDutyCard(
-                        duty: duty,
-                        busy: _busyDutyId == duty.dutyId,
-                        onStart: () =>
-                            _updateStatus(duty, DutyStatus.inProgress),
-                        onComplete: () =>
-                            _updateStatus(duty, DutyStatus.completed),
-                      ),
-                  if (_myDone.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text(
-                        'Completed (${_myDone.length})',
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          color: colors.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-
-                  const SizedBox(height: 24),
-                  Wrap(
-                    alignment: WrapAlignment.spaceBetween,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 12,
-                    runSpacing: 8,
-                    children: [
-                      _sectionLabel(
-                        colors,
-                        Icons.calendar_today_outlined,
-                        'Weekly duty roster',
-                      ),
-                      Container(
-                        padding: const EdgeInsets.all(3),
-                        decoration: BoxDecoration(
-                          color: colors.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _genderChip(colors, 'All', _GenderTab.all),
-                            _genderChip(colors, 'Boys', _GenderTab.boys),
-                            _genderChip(colors, 'Girls', _GenderTab.girls),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          mainAxisSpacing: 8,
-                          crossAxisSpacing: 8,
-                          childAspectRatio: 1.15,
-                        ),
-                    itemCount: _days.length,
-                    itemBuilder: (context, i) {
-                      final d = _days[i];
-                      final isToday = d.num == _todayDayOfWeek;
-                      final people = _rosterForDay(d.num);
-                      return _DayCard(
-                        day: d.short,
-                        dayName: d.name,
-                        people: people,
-                        isToday: isToday,
-                        pulseController: _pulseController,
-                        onTap: () => _openDaySheet(d.num, d.name),
-                      );
-                    },
-                  ),
-
-                  const SizedBox(height: 24),
-                  _sectionLabel(
-                    colors,
-                    Icons.groups_outlined,
-                    'Assigned duties',
-                  ),
-                  if (!_isAdmin) ...[
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: colors.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.info_outline,
-                            size: 14,
+                    for (final d in upcoming) _dutyCard(colors, d, mine: true),
+                  if (done.isNotEmpty)
+                    Theme(
+                      data: Theme.of(context)
+                          .copyWith(dividerColor: Colors.transparent),
+                      child: ExpansionTile(
+                        tilePadding: const EdgeInsets.symmetric(horizontal: 4),
+                        title: Text(
+                          'Completed (${done.length})',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
                             color: colors.onSurfaceVariant,
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Showing your own assignments only — the full list is visible to admins.',
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                color: colors.onSurfaceVariant,
-                              ),
-                            ),
-                          ),
+                        ),
+                        children: [
+                          for (final d in done.take(20))
+                            _dutyCard(colors, d, mine: true),
                         ],
                       ),
                     ),
-                  ],
+                  const SizedBox(height: 18),
+
+                  // ── Weekly roster ─────────────────────────────────
+                  SectionHeader(
+                    'Weekly roster',
+                    actionLabel: _isAdmin ? 'Add person' : null,
+                    onAction: _isAdmin ? _openAddRosterSheet : null,
+                  ),
+                  _genderFilter(colors),
                   const SizedBox(height: 10),
-                  if (_duties.isEmpty)
-                    _emptyCard(colors, 'No duties assigned yet.')
-                  else
-                    for (final duty in _duties)
-                      Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: colors.surface,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: colors.outlineVariant),
-                        ),
-                        child: Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 15,
-                              backgroundColor: _accent,
-                              child: Text(
-                                _displayNameFor(duty.assignedTo).isNotEmpty
-                                    ? _displayNameFor(
-                                        duty.assignedTo,
-                                      )[0].toUpperCase()
-                                    : '?',
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    duty.title,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                      color: colors.onSurface,
-                                    ),
-                                  ),
-                                  Text(
-                                    '${_displayNameFor(duty.assignedTo)} · ${DateFormat.MMMd().format(duty.assignedDate)}',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: colors.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            _statusPill(duty.status),
-                          ],
-                        ),
-                      ),
+                  _weekStrip(colors),
+                  const SizedBox(height: 10),
+                  _dayPeople(colors),
+
+                  // ── Admin: everything assigned ────────────────────
+                  if (_isAdmin) ...[
+                    const SizedBox(height: 24),
+                    SectionHeader('All assigned duties · ${_duties.length}'),
+                    if (_duties.isEmpty)
+                      _emptyCard(
+                        colors,
+                        Icons.assignment_outlined,
+                        'Nothing assigned yet — tap "Assign duty".',
+                      )
+                    else
+                      for (final status in [
+                        DutyStatus.inProgress,
+                        DutyStatus.pending,
+                        DutyStatus.missed,
+                        DutyStatus.completed,
+                      ])
+                        ..._adminGroup(colors, status),
+                  ],
                 ],
               ),
             ),
     );
   }
 
-  Widget _sectionLabel(ColorScheme colors, IconData icon, String label) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 15, color: colors.onSurfaceVariant),
-        const SizedBox(width: 6),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: colors.onSurfaceVariant,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _emptyCard(ColorScheme colors, String label) {
+  Widget _todayCard(
+    ColorScheme colors,
+    List<RosterEntry> people,
+    List<Duty> myToday,
+  ) {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 28),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colors.outlineVariant),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.ink, Color(0xFF2A160B), AppColors.primaryDeep],
+        ),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            Icons.checklist_outlined,
-            size: 26,
-            color: colors.onSurfaceVariant,
+          Row(
+            children: [
+              FadeTransition(
+                opacity: Tween(begin: 0.35, end: 1.0).animate(_pulseController),
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: AppColors.primary,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'TODAY · ${DateFormat('EEEE d MMM').format(DateTime.now()).toUpperCase()}',
+                style: const TextStyle(
+                  color: AppColors.primaryBorder,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.8,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Text(
-            label,
-            style: TextStyle(fontSize: 12.5, color: colors.onSurfaceVariant),
+            myToday.isNotEmpty
+                ? 'You\'re on duty today'
+                : people.isEmpty
+                ? 'No one on the roster today'
+                : '${people.length} on duty today',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.3,
+            ),
           ),
+          if (myToday.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              myToday.map((d) => d.title).join(' · '),
+              style: const TextStyle(color: Colors.white70, fontSize: 13),
+            ),
+          ],
+          if (people.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final p in people.take(8))
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(4, 4, 10, 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircleAvatar(
+                          radius: 11,
+                          backgroundColor: AppColors.primary,
+                          child: Text(
+                            p.displayName.isEmpty
+                                ? '?'
+                                : p.displayName[0].toUpperCase(),
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          p.displayName.split(' ').first,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (people.length > 8)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      '+${people.length - 8} more',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+          if (myToday.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                if (myToday.first.status == DutyStatus.pending)
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: const BorderSide(color: Colors.white38),
+                      ),
+                      onPressed: _busyDutyId == null
+                          ? () => _updateStatus(
+                              myToday.first,
+                              DutyStatus.inProgress,
+                            )
+                          : null,
+                      child: const Text('Start'),
+                    ),
+                  ),
+                if (myToday.first.status == DutyStatus.pending)
+                  const SizedBox(width: 10),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: _busyDutyId == null
+                        ? () =>
+                              _updateStatus(myToday.first, DutyStatus.completed)
+                        : null,
+                    icon: const Icon(Icons.check_rounded, size: 18),
+                    label: const Text('Mark done'),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _genderChip(ColorScheme colors, String label, _GenderTab tab) {
-    final selected = _genderTab == tab;
-    return GestureDetector(
-      onTap: () => setState(() => _genderTab = tab),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: selected ? colors.surface : Colors.transparent,
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: selected ? colors.onSurface : colors.onSurfaceVariant,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _statusPill(DutyStatus status) {
-    final map = {
-      DutyStatus.pending: (label: 'Pending', color: Colors.grey),
-      DutyStatus.inProgress: (label: 'In progress', color: _amber),
-      DutyStatus.completed: (label: 'Completed', color: _green),
-      DutyStatus.missed: (label: 'Missed', color: _red),
-    };
-    final meta = map[status]!;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: meta.color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        meta.label,
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          color: meta.color,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTodayBanner(ColorScheme colors) {
-    return AnimatedBuilder(
-      animation: _pulseController,
-      builder: (context, child) {
-        final glow = 0.08 + (_pulseController.value * 0.08);
-        return Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: _accent.withValues(alpha: glow),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: _accent.withValues(alpha: 0.3)),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(
-                  color: _accent,
-                  shape: BoxShape.circle,
-                ),
+  Widget _statsRow(ColorScheme colors, List<Duty> upcoming, List<Duty> done) {
+    final inProgress = upcoming
+        .where((d) => d.status == DutyStatus.inProgress)
+        .length;
+    final overdue = upcoming.where(_isOverdue).length;
+    final tiles = [
+      (upcoming.length - inProgress, 'To do', _amber),
+      (inProgress, 'In progress', _accent),
+      (done.length, 'Done', _green),
+      if (overdue > 0) (overdue, 'Overdue', _red),
+    ];
+    return Row(
+      children: [
+        for (var i = 0; i < tiles.length; i++) ...[
+          if (i > 0) const SizedBox(width: 8),
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: colors.surface,
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                border: Border.all(color: colors.outlineVariant),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'You have a duty due today',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: _accent,
+              child: Column(
+                children: [
+                  Text(
+                    '${tiles[i].$1}',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: tiles[i].$3,
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 2),
+                  Text(
+                    tiles[i].$2,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        );
-      },
+        ],
+      ],
     );
   }
-}
 
-class _MyDutyCard extends StatelessWidget {
-  final Duty duty;
-  final bool busy;
-  final VoidCallback onStart;
-  final VoidCallback onComplete;
-
-  const _MyDutyCard({
-    required this.duty,
-    required this.busy,
-    required this.onStart,
-    required this.onComplete,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final today = DateTime.now();
-    final overdue =
-        duty.assignedDate.isBefore(
-          DateTime(today.year, today.month, today.day),
-        ) &&
-        duty.status != DutyStatus.completed;
-
+  Widget _dutyCard(
+    ColorScheme colors,
+    Duty d, {
+    required bool mine,
+    bool showAssignee = false,
+  }) {
+    final m = _meta(d.status);
+    final overdue = _isOverdue(d);
+    final today = _isToday(d.assignedDate);
+    final busy = _busyDutyId == d.dutyId;
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colors.outlineVariant),
+        color: today ? colors.primaryContainer : colors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(
+          color: overdue
+              ? _red.withValues(alpha: 0.5)
+              : (today ? _accent : colors.outlineVariant),
+          width: today || overdue ? 1.4 : 1,
+        ),
       ),
+      padding: const EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
+              // Date block
+              Container(
+                width: 48,
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                decoration: BoxDecoration(
+                  color: today ? _accent : colors.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      duty.title,
+                      DateFormat('MMM').format(d.assignedDate).toUpperCase(),
                       style: TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w700,
-                        color: colors.onSurface,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: today ? Colors.white : colors.onSurfaceVariant,
                       ),
                     ),
-                    if (duty.description != null)
-                      Text(
-                        duty.description!,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: colors.onSurfaceVariant,
-                        ),
-                      ),
-                    const SizedBox(height: 3),
                     Text(
-                      'Due ${DateFormat('EEE, MMM d').format(duty.assignedDate)}',
+                      '${d.assignedDate.day}',
                       style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: overdue ? FontWeight.w700 : FontWeight.w400,
-                        color: overdue ? _red : colors.onSurfaceVariant,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: today ? Colors.white : colors.onSurface,
                       ),
                     ),
                   ],
                 ),
               ),
-              _statusPillFor(duty.status),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      d.title,
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w700,
+                        color: colors.onSurface,
+                      ),
+                    ),
+                    if ((d.description ?? '').isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        d.description!,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: m.color.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(m.icon, size: 11, color: m.color),
+                              const SizedBox(width: 4),
+                              Text(
+                                m.label,
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: m.color,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (overdue)
+                          const Text(
+                            'Overdue',
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
+                              color: _red,
+                            ),
+                          ),
+                        if (today && !overdue)
+                          const Text(
+                            'Today',
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
+                              color: _accent,
+                            ),
+                          ),
+                        if (showAssignee)
+                          Text(
+                            '· ${_displayNameFor(d.assignedTo)}',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: colors.onSurfaceVariant,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              if (duty.status == DutyStatus.pending) ...[
-                OutlinedButton(
-                  onPressed: busy ? null : onStart,
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: colors.outlineVariant),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 8,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(999),
+          if (mine && d.status != DutyStatus.completed) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                if (d.status == DutyStatus.pending)
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: busy
+                          ? null
+                          : () => _updateStatus(d, DutyStatus.inProgress),
+                      icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                      label: const Text('Start'),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(0, 40),
+                      ),
                     ),
                   ),
-                  child: const Text('Start', style: TextStyle(fontSize: 12)),
+                if (d.status == DutyStatus.pending) const SizedBox(width: 8),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: busy
+                        ? null
+                        : () => _updateStatus(d, DutyStatus.completed),
+                    icon: const Icon(Icons.check_rounded, size: 18),
+                    label: const Text('Mark done'),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(0, 40),
+                    ),
+                  ),
                 ),
-                const SizedBox(width: 8),
               ],
-              if (duty.status != DutyStatus.completed)
-                ElevatedButton.icon(
-                  onPressed: busy ? null : onComplete,
-                  icon: const Icon(Icons.check, size: 14),
-                  label: const Text('Done', style: TextStyle(fontSize: 12)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: colors.onSurface,
-                    foregroundColor: colors.surface,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 8,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                  ),
-                ),
-            ],
-          ),
+            ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _statusPillFor(DutyStatus status) {
-    final map = {
-      DutyStatus.pending: (label: 'Pending', color: Colors.grey),
-      DutyStatus.inProgress: (label: 'In progress', color: _amber),
-      DutyStatus.completed: (label: 'Completed', color: _green),
-      DutyStatus.missed: (label: 'Missed', color: _red),
-    };
-    final meta = map[status]!;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: meta.color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        meta.label,
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          color: meta.color,
-        ),
-      ),
+  Widget _genderFilter(ColorScheme colors) {
+    return Wrap(
+      spacing: 8,
+      children: [
+        for (final (tab, label) in [
+          (_GenderTab.all, 'Everyone'),
+          (_GenderTab.boys, 'Boys'),
+          (_GenderTab.girls, 'Girls'),
+        ])
+          ChoiceChip(
+            label: Text(label),
+            selected: _genderTab == tab,
+            onSelected: (_) => setState(() => _genderTab = tab),
+          ),
+      ],
     );
   }
-}
 
-/// A roster day tile — pulses a "LIVE" badge if it's today's day.
-class _DayCard extends StatelessWidget {
-  final String day;
-  final String dayName;
-  final List<RosterEntry> people;
-  final bool isToday;
-  final AnimationController pulseController;
-  final VoidCallback onTap;
+  /// All seven days always fit across the screen (no scrolling), so today
+  /// is never hidden off the edge.
+  Widget _weekStrip(ColorScheme colors) {
+    return Row(
+      children: [
+        for (var i = 0; i < _days.length; i++) ...[
+          if (i > 0) const SizedBox(width: 5),
+          Expanded(child: _dayChip(colors, _days[i])),
+        ],
+      ],
+    );
+  }
 
-  const _DayCard({
-    required this.day,
-    required this.dayName,
-    required this.people,
-    required this.isToday,
-    required this.pulseController,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: isToday ? _accent.withValues(alpha: 0.06) : colors.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isToday
-                ? _accent.withValues(alpha: 0.35)
-                : colors.outlineVariant,
-            width: isToday ? 1.4 : 1,
+  Widget _dayChip(
+    ColorScheme colors,
+    ({int num, String name, String short}) d,
+  ) {
+    final selected = d.num == _selectedDay;
+    final isToday = d.num == _todayDayOfWeek;
+    final count = _rosterForDay(d.num).length;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: '${d.name}, $count on duty',
+      child: GestureDetector(
+        onTap: () => setState(() => _selectedDay = d.num),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          height: 68,
+          decoration: BoxDecoration(
+            color: selected ? _accent : colors.surface,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(
+              color: selected
+                  ? _accent
+                  : (isToday
+                        ? _accent.withValues(alpha: 0.6)
+                        : colors.outlineVariant),
+            ),
           ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  day.toUpperCase(),
+                  d.short,
                   style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: isToday ? _accent : colors.onSurfaceVariant,
-                    letterSpacing: 0.3,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: selected ? Colors.white : colors.onSurfaceVariant,
                   ),
                 ),
-                if (isToday) ...[
-                  const SizedBox(width: 6),
-                  AnimatedBuilder(
-                    animation: pulseController,
-                    builder: (context, child) {
-                      final scale = 0.85 + (pulseController.value * 0.3);
-                      return Opacity(
-                        opacity: 0.5 + (pulseController.value * 0.5),
-                        child: Transform.scale(scale: scale, child: child),
-                      );
-                    },
-                    child: Container(
-                      width: 6,
-                      height: 6,
-                      decoration: const BoxDecoration(
-                        color: _accent,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
+                const SizedBox(height: 3),
+                Text(
+                  '$count',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: selected ? Colors.white : colors.onSurface,
                   ),
-                ],
+                ),
+                Container(
+                  margin: const EdgeInsets.only(top: 3),
+                  width: 5,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: isToday
+                        ? (selected ? Colors.white : _accent)
+                        : Colors.transparent,
+                    shape: BoxShape.circle,
+                  ),
+                ),
               ],
             ),
-            const SizedBox(height: 8),
-            if (people.isEmpty)
-              Text(
-                'No one assigned',
-                style: TextStyle(
-                  fontSize: 10.5,
-                  fontStyle: FontStyle.italic,
-                  color: colors.onSurfaceVariant,
-                ),
-              )
-            else
-              ...people
-                  .take(3)
-                  .map(
-                    (p) => Padding(
-                      padding: const EdgeInsets.only(bottom: 3),
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 8,
-                            backgroundColor: _accent,
-                            child: Text(
-                              p.displayName.isNotEmpty
-                                  ? p.displayName[0].toUpperCase()
-                                  : '?',
-                              style: const TextStyle(
-                                fontSize: 8,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 5),
-                          Expanded(
-                            child: Text(
-                              p.displayName,
-                              style: TextStyle(
-                                fontSize: 10.5,
-                                color: colors.onSurface,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _dayPeople(ColorScheme colors) {
+    final day = _days.firstWhere((d) => d.num == _selectedDay);
+    final people = _rosterForDay(day.num);
+    return Container(
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: colors.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 6, 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${day.name}${day.num == _todayDayOfWeek ? ' · today' : ''}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: colors.onSurface,
                     ),
                   ),
-            if (people.length > 3)
-              Text(
-                '+${people.length - 3} more',
-                style: TextStyle(fontSize: 10, color: colors.onSurfaceVariant),
+                ),
+                TextButton(
+                  onPressed: () => _openDaySheet(day.num, day.name),
+                  child: const Text('Open'),
+                ),
+              ],
+            ),
+          ),
+          if (people.isEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+              child: Text(
+                'No one rostered for ${day.name}.',
+                style: TextStyle(color: colors.onSurfaceVariant, fontSize: 13),
               ),
-          ],
+            )
+          else
+            for (final p in people)
+              ListTile(
+                dense: true,
+                leading: CircleAvatar(
+                  radius: 15,
+                  backgroundColor: colors.primaryContainer,
+                  child: Text(
+                    p.displayName.isEmpty
+                        ? '?'
+                        : p.displayName[0].toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: colors.onPrimaryContainer,
+                    ),
+                  ),
+                ),
+                title: Text(
+                  p.displayName,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: (p.gender ?? '').isEmpty ? null : Text(p.gender!),
+                trailing: _isAdmin
+                    ? IconButton(
+                        tooltip: 'Remove from roster',
+                        icon: const Icon(
+                          Icons.remove_circle_outline_rounded,
+                          color: _red,
+                          size: 20,
+                        ),
+                        onPressed: () => _removeFromRoster(p),
+                      )
+                    : null,
+              ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _adminGroup(ColorScheme colors, DutyStatus status) {
+    final list = _duties.where((d) => d.status == status).toList()
+      ..sort((a, b) => a.assignedDate.compareTo(b.assignedDate));
+    if (list.isEmpty) return const [];
+    final m = _meta(status);
+    return [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
+        child: Text(
+          '${m.label.toUpperCase()} · ${list.length}',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.8,
+            color: m.color,
+          ),
         ),
+      ),
+      for (final d in list.take(status == DutyStatus.completed ? 10 : 50))
+        _dutyCard(colors, d, mine: false, showAssignee: true),
+    ];
+  }
+
+  Widget _emptyCard(ColorScheme colors, IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 16),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: colors.outlineVariant),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: _accent, size: 26),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: colors.onSurfaceVariant),
+          ),
+        ],
       ),
     );
   }
 }
 
-/// The "live popup" sheet — who's on duty for a given day.
 class _DayRosterSheet extends StatelessWidget {
   final String dayName;
   final bool isToday;
