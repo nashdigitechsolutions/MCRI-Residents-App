@@ -1,5 +1,8 @@
 import 'package:mcri_residents_app/widgets/text_prompt_dialog.dart';
 import 'package:flutter/material.dart';
+
+import 'onboarding_tutorial_screen.dart';
+
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -351,6 +354,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
               label: 'Clear cached data',
               trailing: 'Frees space; nothing is lost',
               onTap: _clearCache,
+            ),
+            _NavRow(
+              icon: Icons.slideshow_rounded,
+              label: 'App tour',
+              trailing: 'See what the app can do',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const OnboardingTutorialScreen(),
+                ),
+              ),
             ),
             _NavRow(
               icon: Icons.language_rounded,

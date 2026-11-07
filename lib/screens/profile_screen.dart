@@ -1476,6 +1476,7 @@ class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
                       color: AppColors.muted,
                     ),
                     decoration: appFieldDecoration(
+                      colors: Theme.of(context).colorScheme,
                       hint: 'Email',
                       focused: false,
                       icon: Icons.mail_outline,

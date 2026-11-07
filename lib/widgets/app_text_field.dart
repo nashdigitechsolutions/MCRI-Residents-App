@@ -1,4 +1,3 @@
-import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 
 import 'input_style.dart';
@@ -56,8 +55,12 @@ class AppTextField extends StatelessWidget {
         onChanged: onChanged,
         onSubmitted: onSubmitted,
         cursorColor: kFieldAccent,
-        style: const TextStyle(fontSize: 14.5, color: AppColors.ink),
+        style: TextStyle(
+          fontSize: 14.5,
+          color: Theme.of(context).colorScheme.onSurface,
+        ),
         decoration: appFieldDecoration(
+          colors: Theme.of(context).colorScheme,
           hint: label,
           icon: icon,
           focused: focused,

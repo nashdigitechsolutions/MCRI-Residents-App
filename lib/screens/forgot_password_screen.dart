@@ -8,8 +8,6 @@ import '../widgets/app_text_field.dart';
 import '../widgets/slide_puzzle_captcha.dart';
 
 const _ink = AppColors.ink;
-const _sheet = AppColors.canvas;
-const _muted = AppColors.muted;
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -19,6 +17,11 @@ class ForgotPasswordScreen extends StatefulWidget {
 }
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+  Color get _sheet => Theme.of(context).scaffoldBackgroundColor;
+  Color get _muted => Theme.of(context).colorScheme.onSurfaceVariant;
+  Color get _cardBg => Theme.of(context).colorScheme.surface;
+  Color get _line => Theme.of(context).colorScheme.outlineVariant;
+
   final _emailController = TextEditingController();
 
   String? _captchaToken;
@@ -117,13 +120,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       24,
                       28 + MediaQuery.of(context).padding.bottom,
                     ),
-                    decoration: const BoxDecoration(
+                    decoration: BoxDecoration(
                       color: _sheet,
                       borderRadius: BorderRadius.vertical(
                         top: Radius.circular(20),
                       ),
                     ),
-                    child: Center(
+                    child: Align(
+                      alignment: Alignment.topCenter,
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 440),
                         child: AnimatedSwitcher(
@@ -259,7 +263,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         const SizedBox(height: 20),
         Text.rich(
           TextSpan(
-            style: const TextStyle(fontSize: 14, color: _muted, height: 1.55),
+            style: TextStyle(fontSize: 14, color: _muted, height: 1.55),
             children: [
               const TextSpan(text: 'If an account exists for '),
               TextSpan(
@@ -311,9 +315,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: _cardBg,
               borderRadius: BorderRadius.circular(AppRadius.md),
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: _line),
             ),
             child: SlidePuzzleCaptcha(
               key: ValueKey(_captchaAttempt),
@@ -327,9 +331,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFFFEF2F2),
+                color: AppColors.dangerDark.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFFECACA)),
+                border: Border.all(
+                  color: AppColors.dangerDark.withValues(alpha: 0.35),
+                ),
               ),
               child: Text(
                 _error!,
@@ -350,7 +356,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           Center(
             child: GestureDetector(
               onTap: () => Navigator.of(context).maybePop(),
-              child: const Text(
+              child: Text(
                 'Back to sign in',
                 style: TextStyle(
                   fontSize: 13,

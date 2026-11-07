@@ -12,6 +12,7 @@ import '../services/biometric_store.dart';
 import '../widgets/app_button.dart';
 import '../widgets/app_text_field.dart';
 import '../widgets/password_field.dart';
+import '../widgets/slide_puzzle_captcha.dart';
 import 'signup_screen.dart';
 import 'forgot_password_screen.dart';
 
@@ -19,8 +20,6 @@ final _emailRegex = RegExp(r'^[^\s@]+@([^\s@.,]+\.)+[^\s@.,]{2,}$');
 
 const _ink = AppColors.ink;
 const _accent = AppColors.primary;
-const _sheet = AppColors.canvas;
-const _muted = AppColors.muted;
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -30,6 +29,11 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  Color get _sheet => Theme.of(context).scaffoldBackgroundColor;
+  Color get _muted => Theme.of(context).colorScheme.onSurfaceVariant;
+  Color get _cardBg => Theme.of(context).colorScheme.surface;
+  Color get _line => Theme.of(context).colorScheme.outlineVariant;
+
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
@@ -37,6 +41,12 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _error;
   bool _needsVerification = false;
   bool _failedAttempt = false;
+
+  /// After 3 wrong passwords a puzzle is required before the next try.
+  int _wrongPasswords = 0;
+  String? _captchaToken;
+  int _captchaKey = 0;
+  bool get _needsCaptcha => _wrongPasswords >= 3;
 
   bool _biometricAvailable = false;
   bool _biometricEnabled = false;
@@ -176,6 +186,10 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _error = 'Password is required');
       return;
     }
+    if (_needsCaptcha && _captchaToken == null) {
+      setState(() => _error = 'Solve the puzzle first so we know it is you');
+      return;
+    }
 
     final replacing =
         _biometricEnabled &&
@@ -219,6 +233,10 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() {
           _error = e.message;
           _failedAttempt = true;
+          if (e.statusCode == 401 || e.statusCode == 400) _wrongPasswords++;
+          // Each try needs a fresh puzzle once the limit is reached.
+          _captchaToken = null;
+          _captchaKey++;
         });
         // Saved password is stale (changed elsewhere): drop it.
         if (fromBiometric && e.statusCode == 401) {
@@ -268,13 +286,14 @@ class _LoginScreenState extends State<LoginScreen> {
                       24,
                       28 + MediaQuery.of(context).padding.bottom,
                     ),
-                    decoration: const BoxDecoration(
+                    decoration: BoxDecoration(
                       color: _sheet,
                       borderRadius: BorderRadius.vertical(
                         top: Radius.circular(20),
                       ),
                     ),
-                    child: Center(
+                    child: Align(
+                      alignment: Alignment.topCenter,
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 440),
                         child: AnimatedSwitcher(
@@ -379,9 +398,9 @@ class _LoginScreenState extends State<LoginScreen> {
         Container(
           padding: const EdgeInsets.fromLTRB(8, 8, 18, 8),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: _cardBg,
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: _line),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -438,10 +457,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
         const SizedBox(height: 14),
-        const Text(
-          'Tap to unlock',
-          style: TextStyle(fontSize: 13, color: _muted),
-        ),
+        Text('Tap to unlock', style: TextStyle(fontSize: 13, color: _muted)),
         if (_error != null) ...[const SizedBox(height: 16), _errorBox()],
         const SizedBox(height: 28),
         TextButton(
@@ -530,9 +546,9 @@ class _LoginScreenState extends State<LoginScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFEF2F2),
+        color: AppColors.dangerDark.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFFECACA)),
+        border: Border.all(color: AppColors.dangerDark.withValues(alpha: 0.35)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -603,6 +619,14 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
           ),
+          if (_needsCaptcha) ...[
+            const SizedBox(height: 14),
+            SlidePuzzleCaptcha(
+              key: ValueKey('login-captcha-$_captchaKey'),
+              onVerified: (t) => setState(() => _captchaToken = t),
+              onReset: () => setState(() => _captchaToken = null),
+            ),
+          ],
           if (_error != null) ...[const SizedBox(height: 12), _errorBox()],
           const SizedBox(height: 20),
           AppButton(
@@ -629,7 +653,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 style: OutlinedButton.styleFrom(
                   foregroundColor: _ink,
                   backgroundColor: Colors.white,
-                  side: const BorderSide(color: AppColors.border),
+                  side: BorderSide(color: _line),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: const StadiumBorder(),
                 ),
@@ -661,7 +685,7 @@ class _LoginScreenState extends State<LoginScreen> {
             alignment: WrapAlignment.center,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              const Text(
+              Text(
                 "Don't have an account yet? ",
                 style: TextStyle(fontSize: 13, color: _muted),
               ),

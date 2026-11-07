@@ -12,8 +12,6 @@ import '../widgets/password_field.dart';
 import '../widgets/slide_puzzle_captcha.dart';
 
 const _ink = AppColors.ink;
-const _sheet = AppColors.canvas;
-const _muted = AppColors.muted;
 
 class ResetPasswordScreen extends StatefulWidget {
   final String? token;
@@ -25,6 +23,11 @@ class ResetPasswordScreen extends StatefulWidget {
 }
 
 class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
+  Color get _sheet => Theme.of(context).scaffoldBackgroundColor;
+  Color get _muted => Theme.of(context).colorScheme.onSurfaceVariant;
+  Color get _cardBg => Theme.of(context).colorScheme.surface;
+  Color get _line => Theme.of(context).colorScheme.outlineVariant;
+
   final _passwordController = TextEditingController();
   Timer? _redirectTimer;
 
@@ -127,13 +130,14 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                       24,
                       28 + MediaQuery.of(context).padding.bottom,
                     ),
-                    decoration: const BoxDecoration(
+                    decoration: BoxDecoration(
                       color: _sheet,
                       borderRadius: BorderRadius.vertical(
                         top: Radius.circular(20),
                       ),
                     ),
-                    child: Center(
+                    child: Align(
+                      alignment: Alignment.topCenter,
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 440),
                         child: AnimatedSwitcher(
@@ -263,7 +267,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
           ),
         ),
         const SizedBox(height: 18),
-        const Text(
+        Text(
           'Taking you to sign in\u2026',
           style: TextStyle(fontSize: 14, color: _muted),
         ),
@@ -312,9 +316,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: _cardBg,
               borderRadius: BorderRadius.circular(AppRadius.md),
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: _line),
             ),
             child: SlidePuzzleCaptcha(
               onVerified: (token) => setState(() => _captchaToken = token),
@@ -327,9 +331,11 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFFFEF2F2),
+                color: AppColors.dangerDark.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFFECACA)),
+                border: Border.all(
+                  color: AppColors.dangerDark.withValues(alpha: 0.35),
+                ),
               ),
               child: Text(
                 _error!,
@@ -352,7 +358,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
           Center(
             child: GestureDetector(
               onTap: () => Navigator.of(context).maybePop(),
-              child: const Text(
+              child: Text(
                 'Back to sign in',
                 style: TextStyle(
                   fontSize: 13,

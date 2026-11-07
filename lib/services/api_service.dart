@@ -215,14 +215,16 @@ class ApiService {
       final pending = _inflight[key];
       if (pending != null) return pending;
     }
-    final request = _send('GET', path, retry: true).then((data) {
-      _cache[key] = (at: DateTime.now(), data: data);
-      return data;
-    }).whenComplete(() {
-      // Block body on purpose: `=> _inflight.remove(key)` would RETURN this
-      // very Future, and whenComplete would then wait on itself forever.
-      _inflight.remove(key);
-    });
+    final request = _send('GET', path, retry: true)
+        .then((data) {
+          _cache[key] = (at: DateTime.now(), data: data);
+          return data;
+        })
+        .whenComplete(() {
+          // Block body on purpose: `=> _inflight.remove(key)` would RETURN this
+          // very Future, and whenComplete would then wait on itself forever.
+          _inflight.remove(key);
+        });
     _inflight[key] = request;
     return request;
   }

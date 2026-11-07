@@ -9,6 +9,7 @@ import 'providers/settings_provider.dart';
 import 'providers/unread_provider.dart';
 import 'providers/websocket_provider.dart';
 import 'screens/conversation_detail_screen.dart';
+import 'screens/onboarding_tutorial_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_shell.dart';
 import 'services/api_service.dart';
@@ -306,11 +307,24 @@ class _AuthGateState extends State<_AuthGate> {
   // The launch animation plays once per cold start, and stays up until both
   // it has finished and the stored session has been checked.
   bool _splashDone = false;
+  bool? _tourSeen; // null until read from storage
+
+  @override
+  void initState() {
+    super.initState();
+    OnboardingTutorialScreen.hasBeenSeen()
+        .then((seen) {
+          if (mounted) setState(() => _tourSeen = seen);
+        })
+        .catchError((_) {
+          if (mounted) setState(() => _tourSeen = true);
+        });
+  }
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
-    final showSplash = !_splashDone || auth.loading;
+    final showSplash = !_splashDone || auth.loading || _tourSeen == null;
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 420),
       switchInCurve: Curves.easeOutCubic,
@@ -330,6 +344,11 @@ class _AuthGateState extends State<_AuthGate> {
             )
           : auth.isLoggedIn
           ? const MainShell(key: ValueKey('shell'))
+          : _tourSeen == false
+          ? OnboardingTutorialScreen(
+              key: const ValueKey('tour'),
+              onDone: () => setState(() => _tourSeen = true),
+            )
           : const LoginScreen(key: ValueKey('login')),
     );
   }

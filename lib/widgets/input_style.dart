@@ -57,7 +57,7 @@ class _AppFieldShellState extends State<AppFieldShell> {
       duration: const Duration(milliseconds: 200),
       curve: Curves.easeOut,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(AppRadius.sm + 2),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         boxShadow: [
           BoxShadow(
             color: _focused
@@ -81,16 +81,27 @@ InputDecoration appFieldDecoration({
   Widget? suffix,
   String? errorText,
   bool enabled = true,
+  ColorScheme? colors,
 }) {
+  // Same look as the profile form: floating label, 12px corners, theme
+  // surface fill (so dark mode works), hairline outline → orange on focus.
+  final border0 = colors?.outlineVariant ?? kFieldBorder;
   OutlineInputBorder border(Color color, [double width = 1]) =>
       OutlineInputBorder(
-        borderRadius: BorderRadius.circular(AppRadius.sm + 2),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         borderSide: BorderSide(color: color, width: width),
       );
 
   return InputDecoration(
-    hintText: hint,
-    hintStyle: const TextStyle(color: kFieldHint, fontSize: 14),
+    labelText: hint,
+    floatingLabelStyle: TextStyle(
+      color: focused ? kFieldAccent : (colors?.onSurfaceVariant ?? kFieldHint),
+      fontWeight: FontWeight.w600,
+    ),
+    labelStyle: TextStyle(
+      color: colors?.onSurfaceVariant ?? kFieldHint,
+      fontSize: 14,
+    ),
     errorText: errorText,
     errorStyle: const TextStyle(fontSize: 12, color: kFieldError, height: 1.3),
     prefixIcon: icon == null
@@ -105,14 +116,16 @@ InputDecoration appFieldDecoration({
           ),
     suffixIcon: suffix,
     filled: true,
-    fillColor: enabled ? Colors.white : AppColors.fieldDisabled,
+    fillColor: enabled
+        ? (colors?.surface ?? Colors.white)
+        : (colors?.surfaceContainerHighest ?? AppColors.fieldDisabled),
     contentPadding: EdgeInsets.symmetric(
       horizontal: icon == null ? 22 : 14,
       vertical: 16,
     ),
-    border: border(kFieldBorder),
-    enabledBorder: border(kFieldBorder),
-    disabledBorder: border(kFieldBorder),
+    border: border(border0),
+    enabledBorder: border(border0),
+    disabledBorder: border(border0),
     focusedBorder: border(kFieldAccent, 1.5),
     errorBorder: border(kFieldError),
     focusedErrorBorder: border(kFieldError, 1.5),

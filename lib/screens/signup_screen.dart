@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../widgets/app_button.dart';
+import '../widgets/slide_puzzle_captcha.dart';
 import '../widgets/app_text_field.dart';
 import '../widgets/password_field.dart';
 
@@ -15,8 +16,6 @@ final _emailRegex = RegExp(r'^[^\s@]+@([^\s@.,]+\.)+[^\s@.,]{2,}$');
 
 const _ink = AppColors.ink;
 const _accent = AppColors.primary;
-const _sheet = AppColors.canvas;
-const _muted = AppColors.muted;
 
 /// Per-field validation. Returns a map of field -> message (empty = valid).
 Map<String, String> _validate({
@@ -50,6 +49,9 @@ class SignupScreen extends StatefulWidget {
 }
 
 class _SignupScreenState extends State<SignupScreen> {
+  Color get _sheet => Theme.of(context).scaffoldBackgroundColor;
+  Color get _muted => Theme.of(context).colorScheme.onSurfaceVariant;
+
   final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -58,6 +60,7 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _submitting = false;
   String? _error; // server / generic error
   bool _success = false;
+  String? _captchaToken;
   String _submittedEmail = '';
   Map<String, String> _fieldErrors = {};
 
@@ -98,6 +101,10 @@ class _SignupScreenState extends State<SignupScreen> {
     );
     setState(() => _fieldErrors = errors);
     if (errors.isNotEmpty) return;
+    if (_captchaToken == null) {
+      setState(() => _error = 'Solve the puzzle to show you are human');
+      return;
+    }
 
     setState(() => _submitting = true);
     try {
@@ -155,13 +162,14 @@ class _SignupScreenState extends State<SignupScreen> {
                       24,
                       28 + MediaQuery.of(context).padding.bottom,
                     ),
-                    decoration: const BoxDecoration(
+                    decoration: BoxDecoration(
                       color: _sheet,
                       borderRadius: BorderRadius.vertical(
                         top: Radius.circular(20),
                       ),
                     ),
-                    child: Center(
+                    child: Align(
+                      alignment: Alignment.topCenter,
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 440),
                         child: AnimatedSwitcher(
@@ -293,7 +301,7 @@ class _SignupScreenState extends State<SignupScreen> {
         const SizedBox(height: 20),
         Text.rich(
           TextSpan(
-            style: const TextStyle(fontSize: 14, color: _muted, height: 1.55),
+            style: TextStyle(fontSize: 14, color: _muted, height: 1.55),
             children: [
               const TextSpan(text: 'A confirmation email was sent to '),
               TextSpan(
@@ -382,15 +390,25 @@ class _SignupScreenState extends State<SignupScreen> {
             },
             onSubmitted: (_) => _handleSubmit(),
           ),
+          const SizedBox(height: 16),
+          SlidePuzzleCaptcha(
+            onVerified: (t) => setState(() {
+              _captchaToken = t;
+              _error = null;
+            }),
+            onReset: () => setState(() => _captchaToken = null),
+          ),
           if (_error != null) ...[
             const SizedBox(height: 16),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFFFEF2F2),
+                color: AppColors.dangerDark.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFFECACA)),
+                border: Border.all(
+                  color: AppColors.dangerDark.withValues(alpha: 0.35),
+                ),
               ),
               child: Text(
                 _error!,
@@ -432,7 +450,7 @@ class _SignupScreenState extends State<SignupScreen> {
             alignment: WrapAlignment.center,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              const Text(
+              Text(
                 'Already have an account? ',
                 style: TextStyle(fontSize: 13, color: _muted),
               ),

@@ -1,4 +1,13 @@
 import 'package:mcri_residents_app/widgets/app_loader.dart';
+
+import '../weekly_menu_screen.dart';
+import '../duties_screen.dart';
+import '../equipment_screen.dart';
+import 'admin_profiles_screen.dart';
+import '../../widgets/ui.dart';
+import '../../widgets/charts.dart';
+
+import 'package:intl/intl.dart';
 import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -27,6 +36,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   List<Map<String, dynamic>> _equipRequests = [];
   List<Map<String, dynamic>> _equipReports = [];
   List<Map<String, dynamic>> _duties = [];
+  List<Map<String, dynamic>> _rooms = [];
+  List<Map<String, dynamic>> _users = [];
   bool _loading = true;
   String? _busyId;
 
@@ -44,12 +55,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         ApiService.get('/equipment-requests'),
         ApiService.get('/equipment-reports'),
         ApiService.get('/duties'),
+        ApiService.get('/rooms').catchError((_) => []),
+        ApiService.get('/users').catchError((_) => []),
       ]);
+      if (!mounted) return;
       setState(() {
         _maintenance = (results[0] as List).cast<Map<String, dynamic>>();
         _equipRequests = (results[1] as List).cast<Map<String, dynamic>>();
         _equipReports = (results[2] as List).cast<Map<String, dynamic>>();
         _duties = (results[3] as List).cast<Map<String, dynamic>>();
+        _rooms = (results[4] as List).cast<Map<String, dynamic>>();
+        _users = (results[5] as List).cast<Map<String, dynamic>>();
         _loading = false;
       });
     } catch (e) {
@@ -76,8 +92,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       _equipRequests.where((r) => r['status'] == 'pending').toList();
   List<Map<String, dynamic>> get _openEquipReports =>
       _equipReports.where((r) => r['status'] != 'resolved').toList();
-  List<Map<String, dynamic>> get _pendingDuties =>
-      _duties.where((d) => d['status'] == 'pending').toList();
 
   Future<void> _updateMaintenance(
     Map<String, dynamic> req,
@@ -154,6 +168,302 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
+  // ───────────────────────────── insights ─────────────────────────────
+
+  static DateTime? _date(Map<String, dynamic> m) => DateTime.tryParse(
+    '${m['created_at'] ?? m['request_date'] ?? m['assigned_date'] ?? ''}',
+  );
+
+  /// Requests + reports raised per week, last 8 weeks (oldest → newest).
+  List<(String, num)> get _weeklyActivity {
+    final now = DateTime.now();
+    final startOfThisWeek = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).subtract(Duration(days: now.weekday - 1));
+    final counts = List<int>.filled(8, 0);
+    for (final m in [..._maintenance, ..._equipRequests, ..._equipReports]) {
+      final d = _date(m);
+      if (d == null) continue;
+      final weeksAgo = startOfThisWeek
+          .difference(DateTime(d.year, d.month, d.day))
+          .inDays;
+      final idx = 7 - (weeksAgo < 0 ? 0 : (weeksAgo / 7).ceil());
+      if (idx >= 0 && idx < 8) counts[idx]++;
+    }
+    return [
+      for (var i = 0; i < 8; i++)
+        (
+          DateFormat('d/M')
+              .format(startOfThisWeek.subtract(Duration(days: 7 * (7 - i)))),
+          counts[i],
+        ),
+    ];
+  }
+
+  ({int open, int inProgress, int fixed}) get _repairStatus {
+    var open = 0, inProgress = 0, fixed = 0;
+    for (final m in [..._maintenance, ..._equipReports]) {
+      switch (m['status']) {
+        case 'open':
+          open++;
+        case 'in_progress':
+          inProgress++;
+        case 'resolved':
+          fixed++;
+      }
+    }
+    return (open: open, inProgress: inProgress, fixed: fixed);
+  }
+
+  List<({String label, num value, num max})> get _occupancy {
+    int n(dynamic v) => v is int ? v : int.tryParse('$v') ?? 0;
+    final rows =
+        [
+          for (final r in _rooms)
+            (
+              label: 'Rm ${r['room_number'] ?? '?'}',
+              value: n(r['current_occupancy']),
+              max: n(r['max_capacity']),
+            ),
+        ]..sort(
+          (a, b) => (b.max == 0 ? 0 : b.value / b.max).compareTo(
+            a.max == 0 ? 0 : a.value / a.max,
+          ),
+        );
+    return rows;
+  }
+
+  List<(String, int)> get _topRequested {
+    final counts = <String, int>{};
+    for (final r in _equipRequests) {
+      final name = '${r['equipment_name'] ?? r['item_name'] ?? 'Item'}'.trim();
+      counts[name] =
+          (counts[name] ?? 0) +
+          ((r['quantity'] is int) ? r['quantity'] as int : 1);
+    }
+    final list = counts.entries.map((e) => (e.key, e.value)).toList()
+      ..sort((a, b) => b.$2.compareTo(a.$2));
+    return list.take(5).toList();
+  }
+
+  Widget _insights(ColorScheme colors) {
+    final residents = _users.where((u) => '${u['role_id']}' == '2').length;
+    final beds = _rooms.fold<int>(
+      0,
+      (s, r) => s + (int.tryParse('${r['max_capacity']}') ?? 0),
+    );
+    final occupied = _rooms.fold<int>(
+      0,
+      (s, r) => s + (int.tryParse('${r['current_occupancy']}') ?? 0),
+    );
+    final occPct = beds == 0 ? 0 : ((occupied / beds) * 100).round();
+    final weekly = _weeklyActivity;
+    final thisWeek = weekly.last.$2, lastWeek = weekly[weekly.length - 2].$2;
+    final diff = thisWeek - lastWeek;
+    final repairs = _repairStatus;
+    final dutiesDone = _duties.where((d) => d['status'] == 'completed').length;
+    final dutyPct = _duties.isEmpty
+        ? 0
+        : ((dutiesDone / _duties.length) * 100).round();
+    final purchases = _equipRequests
+        .where((r) => r['status'] == 'pending' || r['status'] == 'approved')
+        .length;
+    final top = _topRequested;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const PageHeading(
+          eyebrow: 'Administration',
+          title: 'Residence at a glance',
+          subtitle: 'Live numbers — pull down to refresh',
+        ),
+        const SizedBox(height: 14),
+        GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: 10,
+          crossAxisSpacing: 10,
+          childAspectRatio: 1.55,
+          children: [
+            StatFigure(
+              label: 'Residents',
+              value: '$residents',
+              icon: Icons.groups_2_outlined,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const AdminProfilesScreen()),
+              ),
+            ),
+            StatFigure(
+              label: 'Occupancy',
+              value: '$occPct%',
+              icon: Icons.bed_outlined,
+              delta: '$occupied of $beds beds',
+            ),
+            StatFigure(
+              label: 'Open repairs',
+              value: '${repairs.open + repairs.inProgress}',
+              icon: Icons.build_circle_outlined,
+              delta: repairs.fixed > 0 ? '${repairs.fixed} fixed so far' : null,
+            ),
+            StatFigure(
+              label: 'Purchases to handle',
+              value: '$purchases',
+              icon: Icons.shopping_cart_outlined,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const EquipmentScreen(initialTab: 'requests'),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // Quick actions
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            ActionChip(
+              avatar: const Icon(Icons.campaign_outlined, size: 18),
+              label: const Text('Broadcast'),
+              onPressed: _openBroadcastSheet,
+            ),
+            ActionChip(
+              avatar: const Icon(Icons.groups_2_outlined, size: 18),
+              label: const Text('All profiles'),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const AdminProfilesScreen()),
+              ),
+            ),
+            ActionChip(
+              avatar: const Icon(Icons.assignment_outlined, size: 18),
+              label: const Text('Duties'),
+              onPressed: () => Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const DutiesScreen())),
+            ),
+            ActionChip(
+              avatar: const Icon(Icons.restaurant_menu_rounded, size: 18),
+              label: const Text('Weekly menu'),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const WeeklyMenuScreen()),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        ChartCard(
+          title: 'Requests & reports per week',
+          subtitle: diff == 0
+              ? '$thisWeek this week — same as last week'
+              : '$thisWeek this week · ${diff > 0 ? '+' : ''}$diff vs last week',
+          chart: ColumnChart(data: weekly),
+          table: [for (final (l, v) in weekly) ('Week of $l', '$v')],
+        ),
+        const SizedBox(height: 12),
+
+        ChartCard(
+          title: 'Repairs by status',
+          subtitle: 'Maintenance requests and equipment faults',
+          chart: SegmentedBar(
+            parts: [
+              (
+                label: 'Open',
+                value: repairs.open,
+                color: StatusColors.critical,
+                icon: Icons.error_outline_rounded,
+              ),
+              (
+                label: 'In progress',
+                value: repairs.inProgress,
+                color: StatusColors.warning,
+                icon: Icons.timelapse_rounded,
+              ),
+              (
+                label: 'Fixed',
+                value: repairs.fixed,
+                color: StatusColors.good,
+                icon: Icons.check_circle_outline_rounded,
+              ),
+            ],
+          ),
+          table: [
+            ('Open', '${repairs.open}'),
+            ('In progress', '${repairs.inProgress}'),
+            ('Fixed', '${repairs.fixed}'),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        if (_rooms.isNotEmpty) ...[
+          ChartCard(
+            title: 'Room occupancy',
+            subtitle: 'Fullest rooms first',
+            chart: CapacityBars(rows: _occupancy),
+            table: [
+              for (final r in _occupancy) (r.label, '${r.value} / ${r.max}'),
+            ],
+          ),
+          const SizedBox(height: 12),
+        ],
+
+        ChartCard(
+          title: 'Duty completion',
+          subtitle: '$dutiesDone of ${_duties.length} duties done',
+          chart: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '$dutyPct%',
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w700,
+                  color: colors.onSurface,
+                ),
+              ),
+              const SizedBox(height: 6),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: _duties.isEmpty ? 0 : dutiesDone / _duties.length,
+                  minHeight: 10,
+                  color: AppColors.primary,
+                  backgroundColor: colors.primaryContainer,
+                ),
+              ),
+            ],
+          ),
+          table: [
+            ('Done', '$dutiesDone'),
+            ('Not done', '${_duties.length - dutiesDone}'),
+          ],
+        ),
+        if (top.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          ChartCard(
+            title: 'Most requested items',
+            subtitle: 'What residents ask the lodge manager for',
+            chart: CapacityBars(
+              severity: false,
+              rows: [
+                for (final (n, c) in top)
+                  (label: n, value: c, max: top.first.$2),
+              ],
+            ),
+            table: [for (final (n, c) in top) (n, '$c')],
+          ),
+        ],
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
@@ -176,47 +486,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
-                  // --- stat strip ---
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _StatTile(
-                          value: '${_pendingMaintenance.length}',
-                          label: 'Open repairs',
-                          color: _red,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _StatTile(
-                          value: '${_pendingEquipRequests.length}',
-                          label: 'Equip. requests',
-                          color: _amber,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _StatTile(
-                          value: '${_openEquipReports.length}',
-                          label: 'Equip. reports',
-                          color: _accent,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _StatTile(
-                          value: '${_pendingDuties.length}',
-                          label: 'Pending duties',
-                          color: _green,
-                        ),
-                      ),
-                    ],
-                  ),
-
+                  _insights(colors),
                   const SizedBox(height: 20),
                   _sectionHeading(colors, 'Repairs', 'Maintenance requests'),
                   const SizedBox(height: 8),
@@ -268,7 +538,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         icon: Icons.build_outlined,
                         title:
                             req['equipment_name'] as String? ??
-                            'Item #${req['equipment_id']}',
+                            req['item_name'] as String? ??
+                            'Equipment request',
                         actions: [
                           _smallOutlined(
                             'Reject',
@@ -590,59 +861,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             Icon(Icons.arrow_forward, size: 13, color: colors.onSurfaceVariant),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _StatTile extends StatelessWidget {
-  final String value;
-  final String label;
-  final Color color;
-
-  const _StatTile({
-    required this.value,
-    required this.label,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: colors.outlineVariant),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 6,
-                height: 6,
-                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: colors.onSurface,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: TextStyle(fontSize: 10.5, color: colors.onSurfaceVariant),
-          ),
-        ],
       ),
     );
   }

@@ -8,6 +8,8 @@ import 'package:provider/provider.dart';
 import '../models/weekly_menu_entry.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
+import '../widgets/ui.dart';
+import '../utils/whatsapp_share.dart';
 
 const List<String> _days = [
   'Monday',
@@ -99,162 +101,494 @@ class _WeeklyMenuScreenState extends State<WeeklyMenuScreen> {
     }
   }
 
+  String _selectedDay = _todayName();
+  bool _weekGrid = false;
+
+  bool get _isAdmin => context.read<AuthProvider>().isAdmin;
+
+  /// Which meal is "up next" for the time of day; late evening rolls over
+  /// to tomorrow's breakfast.
+  ({String day, String meal, String dish}) _upNext(List<WeeklyMenuEntry> week) {
+    final now = DateTime.now();
+    final minutes = now.hour * 60 + now.minute;
+    var dayIndex = now.weekday - 1;
+    String meal;
+    if (minutes < 10 * 60 + 30) {
+      meal = 'Breakfast';
+    } else if (minutes < 15 * 60) {
+      meal = 'Lunch';
+    } else if (minutes < 21 * 60) {
+      meal = 'Dinner';
+    } else {
+      meal = 'Breakfast';
+      dayIndex = (dayIndex + 1) % 7;
+    }
+    final e = week[dayIndex];
+    final dish = switch (meal) {
+      'Breakfast' => e.breakfast,
+      'Lunch' => e.lunch,
+      _ => e.dinner,
+    };
+    return (day: _days[dayIndex], meal: meal, dish: dish);
+  }
+
+  String _shareText(WeeklyMenuEntry e) {
+    String line(String emoji, String label, String v) =>
+        '$emoji *$label:* ${v.isEmpty ? '—' : v}';
+    return [
+      '🍽️ *MCRI menu — ${e.dayOfWeek}*',
+      line('🍳', 'Breakfast', e.breakfast),
+      line('🥗', 'Lunch', e.lunch),
+      line('🍲', 'Dinner', e.dinner),
+    ].join('\n');
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isStaff = context.watch<AuthProvider>().user?.roleId == 1;
-    final ordered = _ordered(_menu);
-    final today = _todayName();
     final colors = Theme.of(context).colorScheme;
+    final week = _ordered(_menu);
+    final hasAny = _menu.isNotEmpty;
+    final selected = week.firstWhere((e) => e.dayOfWeek == _selectedDay);
+    final next = _upNext(week);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Weekly menu'),
         actions: [
-          if (isStaff)
-            TextButton.icon(
-              onPressed: _openEditSheet,
-              icon: const Icon(Icons.edit_outlined, size: 18),
-              label: const Text('Edit menu'),
+          IconButton(
+            tooltip: _weekGrid ? 'Day view' : 'Week at a glance',
+            icon: Icon(
+              _weekGrid
+                  ? Icons.view_day_outlined
+                  : Icons.calendar_view_week_rounded,
             ),
+            onPressed: () => setState(() => _weekGrid = !_weekGrid),
+          ),
         ],
       ),
+      floatingActionButton: _isAdmin
+          ? FloatingActionButton.extended(
+              onPressed: _openEditSheet,
+              icon: const Icon(Icons.edit_note_rounded),
+              label: const Text('Edit week'),
+            )
+          : null,
       body: _loading
-          ? const AppLoadingView()
+          ? const AppLoadingView(message: 'Loading the menu…')
           : RefreshIndicator(
               onRefresh: () => _fetchMenu(showLoading: false),
-              child: ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: ordered.length,
-                itemBuilder: (context, index) {
-                  final entry = ordered[index];
-                  final isToday = entry.dayOfWeek == today;
-                  final isEmpty = entry.lunch.isEmpty && entry.dinner.isEmpty;
-
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: isToday
-                          ? AppColors.primary.withValues(alpha: 0.08)
-                          : colors.surface,
-                      borderRadius: BorderRadius.circular(AppRadius.md),
-                      border: Border.all(
-                        color: isToday
-                            ? AppColors.primary.withValues(alpha: 0.3)
-                            : colors.outlineVariant,
-                        width: isToday ? 1.5 : 1,
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              entry.dayOfWeek,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+                children: [
+                  const PageHeading(
+                    eyebrow: 'Dining',
+                    title: 'What\'s cooking',
+                    subtitle: 'This week\'s breakfast, lunch and dinner',
+                  ),
+                  const SizedBox(height: 16),
+                  if (!hasAny)
+                    EmptyState(
+                      icon: Icons.restaurant_menu_rounded,
+                      title: 'No menu yet',
+                      message: _isAdmin
+                          ? 'Tap "Edit week" to plan the meals.'
+                          : 'Check back once the menu is posted.',
+                    )
+                  else ...[
+                    _upNextCard(next),
+                    const SizedBox(height: 18),
+                    if (_weekGrid)
+                      _weekTable(colors, week)
+                    else ...[
+                      _dayStrip(colors, week),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              _selectedDay == _todayName()
+                                  ? '$_selectedDay · today'
+                                  : _selectedDay,
                               style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
                                 color: colors.onSurface,
                               ),
                             ),
-                            if (isToday)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 3,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary,
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                                child: const Text(
-                                  'TODAY',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        if (isEmpty)
-                          Text(
-                            'No menu set for this day yet.',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: colors.onSurfaceVariant,
-                              fontStyle: FontStyle.italic,
-                            ),
-                          )
-                        else ...[
-                          _MealRow(
-                            icon: Icons.ramen_dining_outlined,
-                            label: 'Lunch',
-                            value: entry.lunch,
                           ),
-                          const SizedBox(height: 8),
-                          _MealRow(
-                            icon: Icons.nightlight_outlined,
-                            label: 'Dinner',
-                            value: entry.dinner,
+                          TextButton.icon(
+                            onPressed: () =>
+                                shareToWhatsApp(_shareText(selected)),
+                            icon: const Icon(Icons.share_outlined, size: 18),
+                            label: const Text('Share'),
                           ),
                         ],
-                        // Breakfast intentionally not shown — not offered currently.
-                      ],
-                    ),
-                  );
-                },
+                      ),
+                      const SizedBox(height: 6),
+                      for (final (icon, label, time, dish) in [
+                        (
+                          Icons.free_breakfast_outlined,
+                          'Breakfast',
+                          'Morning',
+                          selected.breakfast,
+                        ),
+                        (
+                          Icons.lunch_dining_outlined,
+                          'Lunch',
+                          'Midday',
+                          selected.lunch,
+                        ),
+                        (
+                          Icons.dinner_dining_outlined,
+                          'Dinner',
+                          'Evening',
+                          selected.dinner,
+                        ),
+                      ])
+                        _mealCard(
+                          colors,
+                          icon,
+                          label,
+                          time,
+                          dish,
+                          highlight:
+                              _selectedDay == next.day && label == next.meal,
+                        ),
+                    ],
+                  ],
+                ],
               ),
             ),
     );
   }
-}
 
-class _MealRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
+  Widget _upNextCard(({String day, String meal, String dish}) next) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.ink, Color(0xFF2A160B), AppColors.primaryDeep],
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(AppRadius.md),
+            ),
+            child: Icon(
+              switch (next.meal) {
+                'Breakfast' => Icons.free_breakfast_rounded,
+                'Lunch' => Icons.lunch_dining_rounded,
+                _ => Icons.dinner_dining_rounded,
+              },
+              color: AppColors.primaryBorder,
+              size: 28,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'UP NEXT · ${next.meal.toUpperCase()}${next.day == _todayName() ? '' : ' · ${next.day.toUpperCase()}'}',
+                  style: const TextStyle(
+                    color: AppColors.primaryBorder,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  next.dish.isEmpty ? 'Not on the menu yet' : next.dish,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    height: 1.25,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-  const _MealRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+  Widget _dayStrip(ColorScheme colors, List<WeeklyMenuEntry> week) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 16, color: colors.onSurfaceVariant),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label.toUpperCase(),
-                style: TextStyle(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w700,
-                  color: colors.onSurfaceVariant,
-                  letterSpacing: 0.3,
+        for (var i = 0; i < _days.length; i++) ...[
+          if (i > 0) const SizedBox(width: 5),
+          Expanded(
+            child: Builder(
+              builder: (_) {
+                final day = _days[i];
+                final selected = day == _selectedDay;
+                final today = day == _todayName();
+                final e = week[i];
+                final planned = [
+                  e.breakfast,
+                  e.lunch,
+                  e.dinner,
+                ].where((s) => s.isNotEmpty).length;
+                return Semantics(
+                  button: true,
+                  selected: selected,
+                  label: '$day, $planned of 3 meals planned',
+                  child: GestureDetector(
+                    onTap: () => setState(() => _selectedDay = day),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: selected ? AppColors.primary : colors.surface,
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                        border: Border.all(
+                          color: selected
+                              ? AppColors.primary
+                              : (today
+                                    ? AppColors.primary.withValues(alpha: 0.6)
+                                    : colors.outlineVariant),
+                        ),
+                      ),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              day.substring(0, 3),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                                color: selected
+                                    ? Colors.white
+                                    : colors.onSurface,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                for (var m = 0; m < 3; m++)
+                                  Container(
+                                    margin: const EdgeInsets.symmetric(
+                                      horizontal: 1.5,
+                                    ),
+                                    width: 5,
+                                    height: 5,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: m < planned
+                                          ? (selected
+                                                ? Colors.white
+                                                : AppColors.primary)
+                                          : (selected
+                                                ? Colors.white38
+                                                : colors.outlineVariant),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _mealCard(
+    ColorScheme colors,
+    IconData icon,
+    String label,
+    String time,
+    String dish, {
+    bool highlight = false,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: highlight ? colors.primaryContainer : colors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(
+          color: highlight ? AppColors.primary : colors.outlineVariant,
+          width: highlight ? 1.4 : 1,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: colors.primaryContainer,
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+            ),
+            child: Icon(icon, color: AppColors.primary, size: 21),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '· $time',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                    if (highlight) ...[
+                      const Spacer(),
+                      const Text(
+                        'UP NEXT',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.primary,
+                          letterSpacing: 0.6,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  dish.isEmpty ? 'Not planned yet' : dish,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: dish.isEmpty
+                        ? FontWeight.w400
+                        : FontWeight.w700,
+                    fontStyle: dish.isEmpty
+                        ? FontStyle.italic
+                        : FontStyle.normal,
+                    color: dish.isEmpty
+                        ? colors.onSurfaceVariant
+                        : colors.onSurface,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Whole week in one glance (rows = days, three meals each).
+  Widget _weekTable(ColorScheme colors, List<WeeklyMenuEntry> week) {
+    return Container(
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: colors.outlineVariant),
+      ),
+      child: Column(
+        children: [
+          for (var i = 0; i < week.length; i++) ...[
+            if (i > 0) Divider(height: 1, color: colors.outlineVariant),
+            InkWell(
+              onTap: () => setState(() {
+                _selectedDay = week[i].dayOfWeek;
+                _weekGrid = false;
+              }),
+              child: Container(
+                color: week[i].dayOfWeek == _todayName()
+                    ? colors.primaryContainer
+                    : null,
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 44,
+                      child: Text(
+                        week[i].dayOfWeek.substring(0, 3),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          color: week[i].dayOfWeek == _todayName()
+                              ? AppColors.primary
+                              : colors.onSurface,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          for (final (icon, dish) in [
+                            (Icons.free_breakfast_outlined, week[i].breakfast),
+                            (Icons.lunch_dining_outlined, week[i].lunch),
+                            (Icons.dinner_dining_outlined, week[i].dinner),
+                          ])
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 3),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    icon,
+                                    size: 14,
+                                    color: colors.onSurfaceVariant,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      dish.isEmpty ? '—' : dish,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: colors.onSurface,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                style: TextStyle(fontSize: 13.5, color: colors.onSurface),
-              ),
-            ],
-          ),
-        ),
-      ],
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

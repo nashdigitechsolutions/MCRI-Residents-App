@@ -46,7 +46,13 @@ class StorageService {
   static Future<void> clearAll() async {
     _tokenCache = null;
     _tokenLoaded = true;
+    // Device-level flags survive sign-out (no tour again for the next user).
+    const keep = ['onboarding_seen_v1'];
+    final kept = {for (final k in keep) k: await _storage.read(key: k)};
     await _storage.deleteAll();
+    for (final e in kept.entries) {
+      if (e.value != null) await _storage.write(key: e.key, value: e.value);
+    }
   }
 
   static Future<void> setItem(String key, String value) =>

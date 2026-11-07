@@ -110,8 +110,12 @@ class _AppPasswordFieldState extends State<AppPasswordField> {
             onChanged: widget.onChanged,
             onSubmitted: widget.onSubmitted,
             cursorColor: kFieldAccent,
-            style: const TextStyle(fontSize: 14.5, color: AppColors.ink),
+            style: TextStyle(
+              fontSize: 14.5,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
             decoration: appFieldDecoration(
+              colors: Theme.of(context).colorScheme,
               hint: widget.hint,
               icon: Icons.lock_outline,
               focused: focused,
