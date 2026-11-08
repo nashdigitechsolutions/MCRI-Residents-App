@@ -359,7 +359,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _NavRow(
               icon: Icons.wifi_rounded,
               label: 'WiFi payments',
-              trailing: 'Coming soon',
+              trailing: 'Who has paid · coming soon',
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const WifiPaymentsScreen()),
               ),
