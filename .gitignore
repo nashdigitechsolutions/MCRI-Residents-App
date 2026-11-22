@@ -52,3 +52,6 @@ pods/
 dart_tool/
 cocoapods/
 /android/build/
+
+# Local release notes (not published)
+RELEASE.md
