@@ -22,7 +22,7 @@ import '../widgets/ui.dart';
 import 'conversation_detail_screen.dart';
 import 'profile_screen.dart';
 
-const _appVersion = '1.2.0';
+const _appVersion = '1.0.0';
 
 /// Planned features shown in Settings > Coming soon. Kept in step with the
 /// website's list (src/pages/Settings.tsx). WiFi payments is listed
