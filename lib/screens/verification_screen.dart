@@ -156,7 +156,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
         ),
         const SizedBox(height: 6),
         const Text(
-          'Your account is now active.',
+          'Thanks! An admin will approve your account shortly.',
           style: TextStyle(fontSize: 14, color: AppColors.muted),
         ),
         const SizedBox(height: 28),
@@ -175,7 +175,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
         ),
         const SizedBox(height: 16),
         const Text(
-          'You can now sign in to your account.',
+          "We'll email you as soon as you can sign in.",
           style: TextStyle(fontSize: 13.5, color: AppColors.muted),
         ),
         const SizedBox(height: 20),

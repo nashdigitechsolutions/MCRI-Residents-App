@@ -353,7 +353,7 @@ class _ColumnPainter extends CustomPainter {
     final gridPaint = Paint()
       ..color = grid
       ..strokeWidth = 1;
-    // Gridlines at 0, ½, max — hairline, solid, recessive.
+    // Gridlines at 0, ½, max - hairline, solid, recessive.
     for (final f in [0.5, 1.0]) {
       final y = top + h * (1 - f);
       canvas.drawLine(Offset(axisW, y), Offset(size.width, y), gridPaint);
@@ -528,7 +528,7 @@ class CapacityBars extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(top: 4),
             child: Text(
-              '+${rows.length - maxRows} more — see the table',
+              '+${rows.length - maxRows} more, see the table',
               style: TextStyle(fontSize: 11.5, color: colors.onSurfaceVariant),
             ),
           ),

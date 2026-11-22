@@ -1,7 +1,7 @@
 /// Single source of truth for every host the app talks to.
 ///
 /// The app, website (mcriresidents.online) and API (api.mcriresidents.online)
-/// must stay on the same hosts — the website's bundle uses
+/// must stay on the same hosts - the website's bundle uses
 /// `https://api.mcriresidents.online/api`, so the app does too.
 ///
 /// Override per build without touching code:

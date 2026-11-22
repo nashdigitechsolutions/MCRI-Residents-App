@@ -24,6 +24,43 @@ import 'profile_screen.dart';
 
 const _appVersion = '1.1.0';
 
+/// Planned features shown in Settings > Coming soon. Kept in step with the
+/// website's list (src/pages/Settings.tsx). WiFi payments is listed
+/// separately because it already has a preview screen.
+const comingSoonFeatures = <(IconData, String, String)>[
+  (
+    Icons.alarm_rounded,
+    'Event reminders',
+    'A nudge before events you RSVP\'d to',
+  ),
+  (
+    Icons.local_laundry_service_outlined,
+    'Laundry booking',
+    'Reserve a washing machine slot',
+  ),
+  (
+    Icons.badge_outlined,
+    'Visitor sign-in',
+    'Register guests before they arrive',
+  ),
+  (Icons.search_rounded, 'Lost & found', 'Post and claim lost items'),
+  (
+    Icons.verified_user_outlined,
+    'Two-step sign-in',
+    'Extra security with a one-time code',
+  ),
+  (
+    Icons.mail_outline_rounded,
+    'Weekly email digest',
+    'A summary of the week in your inbox',
+  ),
+  (
+    Icons.translate_rounded,
+    'More languages',
+    'Use the app in your preferred language',
+  ),
+];
+
 /// Every switch here does something real:
 /// - notification switches filter pushes on the server (per category) and
 ///   register/unregister this device,
@@ -67,7 +104,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _update(Preferences Function(Preferences) updater) async {
     AppHaptics.selection();
     final ok = await context.read<SettingsProvider>().update(updater);
-    if (!ok && mounted) _toast('Could not save that change — please try again');
+    if (!ok && mounted) _toast('Could not save that change, please try again');
   }
 
   Future<void> _setPush(bool on) async {
@@ -220,7 +257,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
         _Section(
           title: 'Notifications',
-          footer: 'Turned-off categories still appear in your Notifications list — you just won\'t be alerted.',
+          footer: 'Turned-off categories still appear in your Notifications list, you just won\'t be alerted.',
           children: [
             _SwitchRow(
               icon: Icons.notifications_outlined,
@@ -357,14 +394,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onTap: _clearCache,
             ),
             _NavRow(
-              icon: Icons.wifi_rounded,
-              label: 'WiFi payments',
-              trailing: 'Who has paid · coming soon',
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const WifiPaymentsScreen()),
-              ),
-            ),
-            _NavRow(
               icon: Icons.slideshow_rounded,
               label: 'App tour',
               trailing: 'See what the app can do',
@@ -388,6 +417,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
               label: 'Version',
               trailing: _appVersion,
             ),
+          ],
+        ),
+
+        _Section(
+          title: 'Coming soon',
+          footer: 'These are on the way. We\'ll let you know when each one is ready.',
+          children: [
+            _SoonRow(
+              icon: Icons.wifi_rounded,
+              label: 'WiFi payments',
+              description: 'See who has paid for WiFi each month',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const WifiPaymentsScreen()),
+              ),
+            ),
+            for (final f in comingSoonFeatures)
+              _SoonRow(icon: f.$1, label: f.$2, description: f.$3),
           ],
         ),
 
@@ -620,6 +666,91 @@ class _NavRow extends StatelessWidget {
               ),
             if (onTap != null) ...[
               const SizedBox(width: 4),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 20,
+                color: colors.onSurfaceVariant,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A planned feature: muted, with a "Soon" pill. Tappable only when there
+/// is a preview to show (WiFi payments).
+class _SoonRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String description;
+  final VoidCallback? onTap;
+  const _SoonRow({
+    required this.icon,
+    required this.label,
+    required this.description,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final preview = onTap != null;
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
+        child: Row(
+          children: [
+            _RowIcon(icon, enabled: preview),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: preview
+                          ? colors.onSurface
+                          : colors.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    description,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: preview
+                    ? colors.primaryContainer
+                    : colors.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                preview ? 'PREVIEW' : 'SOON',
+                style: TextStyle(
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.6,
+                  color: preview ? AppColors.primary : colors.onSurfaceVariant,
+                ),
+              ),
+            ),
+            if (preview) ...[
+              const SizedBox(width: 2),
               Icon(
                 Icons.chevron_right_rounded,
                 size: 20,

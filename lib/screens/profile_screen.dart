@@ -55,7 +55,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() => _form = fetched);
       await _saveCache(fetched);
     } catch (e) {
-      // Server fetch failed (or this user has no saved profile yet) —
+      // Server fetch failed (or this user has no saved profile yet) -
       // whatever was in the local cache from _loadCache() stands as-is.
     }
   }
@@ -589,12 +589,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           'Year',
                           _form.yearOfStudy.isNotEmpty
                               ? _form.yearOfStudy
-                              : '—',
+                              : '-',
                           Icons.timeline_rounded,
                         ),
                         (
                           'Cohort',
-                          _form.cohort.isNotEmpty ? _form.cohort : '—',
+                          _form.cohort.isNotEmpty ? _form.cohort : '-',
                           Icons.groups_outlined,
                         ),
                       ]) ...[

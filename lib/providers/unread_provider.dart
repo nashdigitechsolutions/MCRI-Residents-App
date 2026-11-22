@@ -105,7 +105,7 @@ class UnreadProvider extends ChangeNotifier {
 
       _safeNotify();
     } catch (e) {
-      // silent — badges stay at their last known value
+      // silent - badges stay at their last known value
     }
   }
 
@@ -141,7 +141,7 @@ class UnreadProvider extends ChangeNotifier {
     );
     if (idx == -1) {
       // A conversation we don't know about yet (someone just started a chat
-      // with me) — one full sync picks it up.
+      // with me) - one full sync picks it up.
       refresh();
       return;
     }

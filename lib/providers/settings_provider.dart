@@ -167,7 +167,7 @@ class SettingsProvider extends ChangeNotifier {
           : <String, dynamic>{};
       _prefs = Preferences.fromJson(raw);
     } catch (e) {
-      // Fall back to defaults — same graceful behavior as the web app.
+      // Fall back to defaults - same graceful behavior as the web app.
     } finally {
       _loaded = true;
       AppHaptics.enabled = _prefs.haptics;
@@ -188,7 +188,7 @@ class SettingsProvider extends ChangeNotifier {
     final previous = _prefs;
     _prefs = updater(_prefs);
     AppHaptics.enabled = _prefs.haptics;
-    notifyListeners(); // optimistic — screen updates instantly
+    notifyListeners(); // optimistic - screen updates instantly
 
     try {
       await ApiService.post('/user-settings', {'preferences': _prefs.toJson()});

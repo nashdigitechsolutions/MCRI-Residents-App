@@ -259,7 +259,7 @@ class _EquipmentScreenState extends State<EquipmentScreen> with LiveRefresh {
             ? 'Decline ${req.displayName}?'
             : 'Mark ${req.displayName} as bought',
         hint: status == 'rejected'
-            ? 'Reason (optional) — the resident will see this'
+            ? 'Reason (optional). The resident will see this'
             : 'Where to collect it (optional)',
         confirm: status == 'rejected' ? 'Decline' : 'Mark bought',
       );
@@ -276,8 +276,8 @@ class _EquipmentScreenState extends State<EquipmentScreen> with LiveRefresh {
       });
       _notify(switch (status) {
         'approved' =>
-          'Approved — ${req.username ?? 'the resident'} has been told you\'re buying it',
-        'purchased' => 'Marked as bought — the resident has been notified',
+          'Approved, ${req.username ?? 'the resident'} has been told you\'re buying it',
+        'purchased' => 'Marked as bought, the resident has been notified',
         'rejected' => 'Request declined',
         _ => 'Request updated',
       });
@@ -297,7 +297,7 @@ class _EquipmentScreenState extends State<EquipmentScreen> with LiveRefresh {
     if (status == 'resolved') {
       note = await _askNote(
         title: 'Mark as fixed',
-        hint: 'What was done (optional) — the resident will see this',
+        hint: 'What was done (optional). The resident will see this',
         confirm: 'Mark fixed',
       );
       if (note == null) return;
@@ -313,8 +313,8 @@ class _EquipmentScreenState extends State<EquipmentScreen> with LiveRefresh {
       });
       _notify(
         status == 'resolved'
-            ? 'Marked fixed — the resident has been notified'
-            : 'Repair started — the resident has been notified',
+            ? 'Marked fixed, the resident has been notified'
+            : 'Repair started, the resident has been notified',
       );
       await _loadAll(showLoading: false);
     } on ApiException catch (e) {
@@ -412,7 +412,7 @@ class _EquipmentScreenState extends State<EquipmentScreen> with LiveRefresh {
       builder: (_) => _ReportIssueSheet(item: item),
     );
     if (submitted == true) {
-      _notify("Reported to maintenance — we'll let you know when it's fixed");
+      _notify("Reported to maintenance, we'll let you know when it's fixed");
       if (mounted) setState(() => _tab = _Tab.issues);
       _loadAll(showLoading: false);
     }
@@ -1040,7 +1040,7 @@ class _EquipmentScreenState extends State<EquipmentScreen> with LiveRefresh {
         Icons.build_circle_outlined,
         staff
             ? 'Faults reported by residents. Start the repair so they know it\'s being handled, then mark it fixed.'
-            : 'Something broken? Open it in Browse and tap "Report a fault" — maintenance will be alerted.',
+            : 'Something broken? Open it in Browse and tap "Report a fault", maintenance will be alerted.',
       ),
       if (_reports.isEmpty)
         _emptyState(

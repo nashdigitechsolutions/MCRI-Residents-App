@@ -11,7 +11,10 @@ import 'storage_service.dart';
 class ApiException implements Exception {
   final int statusCode;
   final String message;
-  ApiException(this.statusCode, this.message);
+
+  /// Machine-readable reason from the API, e.g. 'pending_approval'.
+  final String? code;
+  ApiException(this.statusCode, this.message, {this.code});
 
   /// 0 = never reached the server (offline, DNS, timeout).
   bool get isNetwork => statusCode == 0;
@@ -24,7 +27,7 @@ class ApiException implements Exception {
 /// Thin JSON client for the MCRI API.
 ///
 /// - One persistent [http.Client] → connections are kept alive and reused
-///   (TLS handshake once instead of per request — the biggest speed win).
+///   (TLS handshake once instead of per request - the biggest speed win).
 /// - Every request has a timeout, so a dead network never hangs a spinner.
 /// - Idempotent GETs retry once on transient network failure.
 /// - A 401 on an authenticated request fires [onUnauthorized] so the app can
@@ -140,6 +143,9 @@ class ApiService {
     throw ApiException(
       response.statusCode,
       _extractMessage(decoded, response.statusCode),
+      code: decoded is Map && decoded['code'] is String
+          ? decoded['code'] as String
+          : null,
     );
   }
 

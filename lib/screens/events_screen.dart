@@ -797,7 +797,7 @@ class _MonthGrid extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // AnimatedContainer: a low-level animation primitive —
+                      // AnimatedContainer: a low-level animation primitive -
                       // change any of its properties (here, color) and Flutter
                       // interpolates smoothly between old and new automatically.
                       AnimatedContainer(

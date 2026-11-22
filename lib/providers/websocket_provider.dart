@@ -30,7 +30,7 @@ class WebSocketProvider extends ChangeNotifier {
   bool get isConnected => _isConnected;
 
   /// Named distinctly from ChangeNotifier's own addListener/removeListener
-  /// (different signature — this is per-event-type, not "notify me of any
+  /// (different signature - this is per-event-type, not "notify me of any
   /// change") to avoid confusing the two mechanisms.
   void on(String type, void Function(dynamic) callback) {
     _listeners.putIfAbsent(type, () => {}).add(callback);

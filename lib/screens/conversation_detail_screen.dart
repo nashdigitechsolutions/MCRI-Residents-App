@@ -1330,7 +1330,7 @@ class _ConversationDetailScreenState extends State<ConversationDetailScreen>
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Pinned${pinned.length > 1 ? ' · ${pinned.length}' : ''} — ${pinned.first.message}',
+                        'Pinned${pinned.length > 1 ? ' · ${pinned.length}' : ''}: ${pinned.first.message}',
                         style: const TextStyle(fontSize: 11.5, color: _accent),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -1381,7 +1381,7 @@ class _ConversationDetailScreenState extends State<ConversationDetailScreen>
                         ? const AppLoadingView(message: 'Loading messages…')
                         : Center(
                             child: Text(
-                              'No messages yet — say hello 👋',
+                              'No messages yet, say hello 👋',
                               style: TextStyle(color: colors.onSurfaceVariant),
                             ),
                           ))

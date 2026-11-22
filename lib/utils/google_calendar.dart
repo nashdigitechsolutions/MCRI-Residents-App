@@ -2,7 +2,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 /// Builds a Google Calendar "quick add" link and opens it in the browser.
 /// Google's template action needs UTC timestamps in the compact
-/// yyyyMMddTHHmmssZ format — no separators, no library needed to build it.
+/// yyyyMMddTHHmmssZ format - no separators, no library needed to build it.
 String _googleDate(DateTime dt) {
   final utc = dt.toUtc();
   String two(int n) => n.toString().padLeft(2, '0');

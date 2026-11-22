@@ -312,7 +312,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 ),
               ),
               const TextSpan(
-                text: '. Please click the link inside to activate your resident portal account.',
+                text: ". Click the link inside to confirm your email. An admin will then approve your account, and we'll email you when you can sign in.",
               ),
             ],
           ),

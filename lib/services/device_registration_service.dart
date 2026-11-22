@@ -13,7 +13,7 @@ class DeviceRegistrationService {
   static String? _lastSent;
 
   /// The push subscription ID isn't always ready the instant permission is
-  /// granted — OneSignal sets it up asynchronously. We register immediately
+  /// granted - OneSignal sets it up asynchronously. We register immediately
   /// if it's already available, and also listen (once) for it to change.
   static Future<void> registerWhenReady() async {
     _lastSent = null;
@@ -41,7 +41,7 @@ class DeviceRegistrationService {
       });
       _lastSent = playerId;
     } catch (_) {
-      // non-fatal — next app open will retry via registerWhenReady()
+      // non-fatal - next app open will retry via registerWhenReady()
     }
   }
 

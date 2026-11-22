@@ -53,7 +53,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
     if (widget.token == null) {
       setState(
-        () => _error = 'This reset link is missing its token \u2014 please use the link from your email.',
+        () => _error = 'This reset link is missing its token, please use the link from your email.',
       );
       return;
     }

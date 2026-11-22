@@ -15,7 +15,7 @@ class OneSignalService {
     return OneSignal.Notifications.requestPermission(true);
   }
 
-  /// Fires when the user taps a push notification — whether the app was
+  /// Fires when the user taps a push notification - whether the app was
   /// backgrounded or fully closed at the time.
   static void listenForTaps(void Function(Map<String, dynamic>? data) onTap) {
     OneSignal.Notifications.addClickListener((event) {

@@ -3,7 +3,7 @@ import '../models/poll_vote_row.dart';
 enum ExportScope { all, names, lunchbox }
 
 /// Builds a plain-text export, matching the web app's .txt branch exactly
-/// (CSV/download were dropped per product decision — WhatsApp text sharing
+/// (CSV/download were dropped per product decision - WhatsApp text sharing
 /// only needs a readable string, not a file).
 String buildPollExportText(List<PollVoteRow> rows, ExportScope scope) {
   if (scope == ExportScope.names) {
@@ -31,11 +31,11 @@ String buildPollExportText(List<PollVoteRow> rows, ExportScope scope) {
     return entries
         .asMap()
         .entries
-        .map((e) => '${e.key + 1}. ${e.value.name} — Box ${e.value.box}')
+        .map((e) => '${e.key + 1}. ${e.value.name} - Box ${e.value.box}')
         .join('\n');
   }
 
-  // scope == all — grouped by option, each with a numbered voter list.
+  // scope == all - grouped by option, each with a numbered voter list.
   final byOption = <String, List<PollVoteRow>>{};
   for (final r in rows) {
     byOption.putIfAbsent(r.optionName, () => []).add(r);
@@ -54,7 +54,7 @@ String buildPollExportText(List<PollVoteRow> rows, ExportScope scope) {
         if (v.roomNumber != null) 'Room ${v.roomNumber}',
         if (v.lunchboxNumber != null) 'Box ${v.lunchboxNumber}',
       ];
-      final details = parts.isEmpty ? '' : ' — ${parts.join(', ')}';
+      final details = parts.isEmpty ? '' : ' - ${parts.join(', ')}';
       buffer.writeln('  ${j + 1}. ${v.residentName}$details');
     }
   }

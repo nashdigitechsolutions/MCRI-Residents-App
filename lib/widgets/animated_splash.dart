@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../theme/logo_geometry.dart';
 
-/// "Building the home" — the launch animation.
+/// "Building the home" - the launch animation.
 ///
 /// Picks up from the native launch screen (same background, same centred
 /// badge) and then:

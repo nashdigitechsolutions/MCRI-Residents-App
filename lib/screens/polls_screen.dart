@@ -17,6 +17,7 @@ import '../services/api_service.dart';
 import '../utils/live_refresh.dart';
 import '../utils/poll_export.dart';
 import '../utils/whatsapp_share.dart';
+import '../widgets/ui.dart';
 
 const _red = AppColors.danger;
 const _green = AppColors.success;
@@ -100,77 +101,115 @@ class _PollsScreenState extends State<PollsScreen> with LiveRefresh {
   @override
   Widget build(BuildContext context) {
     final isAdmin = context.watch<AuthProvider>().user?.roleId == 1;
-    final colors = Theme.of(context).colorScheme;
 
     final openPolls = _polls.where((p) => p.isOpen).toList();
     final pastPolls = _polls.where((p) => !p.isOpen).toList();
 
     return Scaffold(
-      appBar: AppBar(
-        actions: isAdmin
-            ? [
-                IconButton(
-                  onPressed: _openLunchboxSheet,
-                  icon: const Icon(Icons.inventory_2_outlined),
-                  tooltip: 'Lunchboxes',
-                ),
-                IconButton(
-                  onPressed: _openNewPollSheet,
-                  icon: const Icon(Icons.add),
-                  tooltip: 'New poll',
-                ),
-              ]
-            : null,
-      ),
+      appBar: AppBar(),
       body: _loading
           ? const AppLoadingView()
           : AppRefreshIndicator(
               onRefresh: () => _fetchPolls(showLoading: false),
               child: ListView(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
                 children: isAdmin
-                    ? _buildAdminList(colors)
-                    : _buildResidentList(colors, openPolls, pastPolls),
+                    ? _buildAdminList(openPolls, pastPolls)
+                    : _buildResidentList(openPolls, pastPolls),
               ),
             ),
     );
   }
 
-  List<Widget> _buildAdminList(ColorScheme colors) {
+  List<Widget> _buildAdminList(List<PollDetail> open, List<PollDetail> past) {
+    final votes = open.fold<int>(0, (s, p) => s + p.totalVotes);
+    final widgets = <Widget>[
+      PageHeading(
+        eyebrow: 'Kitchen',
+        title: 'Meal polls',
+        subtitle: open.isEmpty
+            ? 'No poll is open right now'
+            : '${open.length} open · $votes vote${votes == 1 ? '' : 's'} so far',
+      ),
+      const SizedBox(height: 16),
+      Row(
+        children: [
+          Expanded(
+            child: FilledButton.icon(
+              onPressed: _openNewPollSheet,
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: const Text('New poll'),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: _openLunchboxSheet,
+              icon: const Icon(Icons.inventory_2_outlined, size: 18),
+              label: const Text('Lunchboxes'),
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 22),
+    ];
+
     if (_polls.isEmpty) {
-      return [
-        _emptyState(
-          colors,
-          'No polls created yet',
-          'Use "New poll" to launch the first meal vote.',
+      widgets.add(
+        const EmptyState(
+          icon: Icons.ramen_dining_outlined,
+          title: 'No polls yet',
+          message: 'Tap "New poll" to launch the first meal vote.',
         ),
-      ];
+      );
+      return widgets;
     }
-    return _polls
-        .map(
-          (poll) => _ManagePollCard(
+
+    void section(String label, List<PollDetail> polls) {
+      if (polls.isEmpty) return;
+      widgets.add(_SectionLabel(label, count: polls.length));
+      for (final poll in polls) {
+        widgets.add(
+          _ManagePollCard(
             key: ValueKey('manage-${poll.pollId}'),
             poll: poll,
             onChanged: () => _fetchPolls(showLoading: false),
             notify: _notify,
           ),
-        )
-        .toList();
+        );
+      }
+      widgets.add(const SizedBox(height: 8));
+    }
+
+    section('Open now', open);
+    section('Closed', past);
+    return widgets;
   }
 
   List<Widget> _buildResidentList(
-    ColorScheme colors,
     List<PollDetail> open,
     List<PollDetail> past,
   ) {
-    final widgets = <Widget>[];
+    final toVote = open.where((p) => p.myOptionIds.isEmpty).length;
+    final widgets = <Widget>[
+      PageHeading(
+        eyebrow: 'Kitchen',
+        title: 'Meal polls',
+        subtitle: open.isEmpty
+            ? 'No vote is open right now'
+            : toVote == 0
+            ? 'You\'re all voted up'
+            : '$toVote poll${toVote == 1 ? '' : 's'} waiting for your vote',
+      ),
+      const SizedBox(height: 18),
+    ];
 
     if (open.isEmpty) {
       widgets.add(
-        _emptyState(
-          colors,
-          'No active polls',
-          'Check back when the next meal vote opens.',
+        const EmptyState(
+          icon: Icons.ramen_dining_outlined,
+          title: 'No active polls',
+          message: 'We\'ll notify you when the next meal vote opens.',
         ),
       );
     } else {
@@ -183,64 +222,75 @@ class _PollsScreenState extends State<PollsScreen> with LiveRefresh {
             notify: _notify,
           ),
         );
-        widgets.add(const SizedBox(height: 12));
+        widgets.add(const SizedBox(height: 14));
       }
     }
 
     if (past.isNotEmpty) {
-      widgets.add(const SizedBox(height: 8));
-      widgets.add(
-        ExpansionTile(
-          tilePadding: EdgeInsets.zero,
-          title: Text(
-            'Past polls (${past.length})',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: colors.onSurfaceVariant,
-            ),
-          ),
-          children: [
-            for (final poll in past) ...[
-              _VoteCard(
-                key: ValueKey('past-${poll.pollId}'),
-                poll: poll,
-                onVoted: () => _fetchPolls(showLoading: false),
-                notify: _notify,
-              ),
-              const SizedBox(height: 12),
-            ],
-          ],
-        ),
-      );
+      widgets.add(const SizedBox(height: 10));
+      widgets.add(_SectionLabel('Past results', count: past.length));
+      for (final poll in past) {
+        widgets.add(
+          _ResultCard(key: ValueKey('past-${poll.pollId}'), poll: poll),
+        );
+      }
     }
 
     return widgets;
   }
+}
 
-  Widget _emptyState(ColorScheme colors, String title, String subtitle) {
+// ───────────────────────────── shared pieces ─────────────────────────────
+
+/// "Closes in 2d 4h", "Closes in 35 min", "Closed Mar 4".
+String _closesLabel(PollDetail poll) {
+  if (!poll.isOpen) return 'Closed ${DateFormat.MMMd().format(poll.endDate)}';
+  final left = poll.endDate.difference(DateTime.now());
+  if (left.inDays >= 1) {
+    final h = left.inHours % 24;
+    return 'Closes in ${left.inDays}d${h > 0 ? ' ${h}h' : ''}';
+  }
+  if (left.inHours >= 1) return 'Closes in ${left.inHours}h';
+  return 'Closes in ${left.inMinutes.clamp(1, 59)} min';
+}
+
+/// The option with the most votes, or null when nobody has voted.
+PollOption? _leader(PollDetail poll) {
+  PollOption? best;
+  for (final o in poll.options) {
+    if (best == null || o.voteCount > best.voteCount) best = o;
+  }
+  return (best == null || best.voteCount == 0) ? null : best;
+}
+
+class _SectionLabel extends StatelessWidget {
+  final String text;
+  final int count;
+  const _SectionLabel(this.text, {required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 48),
-      child: Column(
+      padding: const EdgeInsets.only(left: 2, bottom: 10),
+      child: Row(
         children: [
-          Icon(
-            Icons.ramen_dining_outlined,
-            size: 32,
-            color: colors.onSurfaceVariant,
-          ),
-          const SizedBox(height: 10),
-          Text(
-            title,
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              color: colors.onSurface,
+          Eyebrow(text),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+            decoration: BoxDecoration(
+              color: colors.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(999),
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            style: TextStyle(fontSize: 12.5, color: colors.onSurfaceVariant),
-            textAlign: TextAlign.center,
+            child: Text(
+              '$count',
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+                color: colors.onSurfaceVariant,
+              ),
+            ),
           ),
         ],
       ),
@@ -248,57 +298,353 @@ class _PollsScreenState extends State<PollsScreen> with LiveRefresh {
   }
 }
 
-/// A single option's vote bar — shared by both the resident voting view and
-/// the admin results view.
-class _OptionBar extends StatelessWidget {
+/// Small rounded status pill: green "Open" dot, or grey lock "Closed".
+class _StatusPill extends StatelessWidget {
+  final PollDetail poll;
+  const _StatusPill(this.poll);
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final open = poll.isOpen;
+    final fg = open ? _green : colors.onSurfaceVariant;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: fg.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (open)
+            Container(
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(color: fg, shape: BoxShape.circle),
+            )
+          else
+            Icon(Icons.lock_outline_rounded, size: 11, color: fg),
+          const SizedBox(width: 5),
+          Text(
+            _closesLabel(poll),
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+              color: fg,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Orange rounded tile with a meal icon; anchors every poll card.
+class _MealBadge extends StatelessWidget {
+  final bool muted;
+  const _MealBadge({this.muted = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: muted ? colors.surfaceContainerHighest : colors.primaryContainer,
+        borderRadius: BorderRadius.circular(AppRadius.sm + 2),
+      ),
+      child: Icon(
+        Icons.ramen_dining_rounded,
+        size: 20,
+        color: muted ? colors.onSurfaceVariant : AppColors.primary,
+      ),
+    );
+  }
+}
+
+/// One option as a tile whose background fills with its share of the vote.
+/// Used for voting (with a check circle), for admin results and for past
+/// results. [highlight] marks the resident's pick or the leading option.
+class _OptionTile extends StatelessWidget {
   final PollOption option;
   final int total;
-  final bool selected;
+  final bool highlight;
+  final bool? checked; // null = not a voting tile
+  final bool leading;
+  final int? rank;
+  final VoidCallback? onTap;
 
-  const _OptionBar({
+  const _OptionTile({
     required this.option,
     required this.total,
-    required this.selected,
+    this.highlight = false,
+    this.checked,
+    this.leading = false,
+    this.rank,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final pct = total > 0 ? ((option.voteCount / total) * 100).round() : 0;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              option.optionName,
-              style: TextStyle(
-                fontSize: 13.5,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
-                color: selected ? AppColors.primary : colors.onSurface,
-              ),
-            ),
-            Text(
-              '${option.voteCount} vote${option.voteCount == 1 ? '' : 's'} · $pct%',
-              style: TextStyle(fontSize: 11, color: colors.onSurfaceVariant),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(999),
-          child: LinearProgressIndicator(
-            value: total > 0 ? option.voteCount / total : 0,
-            minHeight: 6,
-            backgroundColor: colors.surfaceContainerHighest,
-            valueColor: AlwaysStoppedAnimation(
-              selected
-                  ? AppColors.primary
-                  : colors.onSurfaceVariant.withValues(alpha: 0.4),
+    final share = total > 0 ? option.voteCount / total : 0.0;
+    final pct = (share * 100).round();
+    final accent = highlight || leading;
+    final borderColor = highlight ? AppColors.primary : colors.outlineVariant;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Semantics(
+        button: onTap != null,
+        selected: checked ?? false,
+        child: Material(
+          color: colors.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.sm + 2),
+            side: BorderSide(color: borderColor, width: highlight ? 1.5 : 1),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: Stack(
+              children: [
+                // Vote share fill.
+                Positioned.fill(
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: AnimatedFractionallySizedBox(
+                      duration: const Duration(milliseconds: 450),
+                      curve: Curves.easeOutCubic,
+                      widthFactor: share.clamp(0.0, 1.0),
+                      heightFactor: 1,
+                      child: ColoredBox(
+                        color: accent
+                            ? AppColors.primary.withValues(alpha: 0.13)
+                            : colors.onSurfaceVariant.withValues(alpha: 0.07),
+                      ),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                  child: Row(
+                    children: [
+                      if (checked != null) ...[
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          width: 22,
+                          height: 22,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: checked!
+                                ? AppColors.primary
+                                : Colors.transparent,
+                            border: Border.all(
+                              color: checked!
+                                  ? AppColors.primary
+                                  : colors.outline,
+                              width: 2,
+                            ),
+                          ),
+                          child: checked!
+                              ? const Icon(
+                                  Icons.check_rounded,
+                                  size: 14,
+                                  color: Colors.white,
+                                )
+                              : null,
+                        ),
+                        const SizedBox(width: 12),
+                      ] else if (rank != null) ...[
+                        SizedBox(
+                          width: 22,
+                          child: Text(
+                            '$rank',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              color: leading
+                                  ? AppColors.primary
+                                  : colors.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                      ],
+                      Expanded(
+                        child: Text(
+                          option.optionName,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: accent
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            color: colors.onSurface,
+                          ),
+                        ),
+                      ),
+                      if (leading) ...[
+                        const Icon(
+                          Icons.emoji_events_rounded,
+                          size: 15,
+                          color: AppColors.primary,
+                        ),
+                        const SizedBox(width: 6),
+                      ],
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            '$pct%',
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w800,
+                              color: accent
+                                  ? AppColors.primary
+                                  : colors.onSurface,
+                            ),
+                          ),
+                          Text(
+                            '${option.voteCount} vote${option.voteCount == 1 ? '' : 's'}',
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              color: colors.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Card shell shared by every poll card: meal badge, title, status pill.
+class _PollCardShell extends StatelessWidget {
+  final PollDetail poll;
+  final Widget? headerTrailing;
+  final List<Widget> children;
+  final Widget? footer;
+
+  const _PollCardShell({
+    required this.poll,
+    required this.children,
+    this.headerTrailing,
+    this.footer,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: colors.outlineVariant),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (poll.isOpen) Container(height: 3, color: AppColors.primary),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 6),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _MealBadge(muted: !poll.isOpen),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        poll.title,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          height: 1.25,
+                          color: colors.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          _StatusPill(poll),
+                          Text(
+                            '${poll.totalVotes} vote${poll.totalVotes == 1 ? '' : 's'}',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: colors.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                ?headerTrailing,
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 8, 14, 6),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: children,
+            ),
+          ),
+          ?footer,
+        ],
+      ),
+    );
+  }
+}
+
+/// --- Resident: a closed poll's results ---
+class _ResultCard extends StatelessWidget {
+  final PollDetail poll;
+  const _ResultCard({super.key, required this.poll});
+
+  @override
+  Widget build(BuildContext context) {
+    final lead = _leader(poll);
+    final sorted = List.of(poll.options)
+      ..sort((a, b) => b.voteCount.compareTo(a.voteCount));
+    return _PollCardShell(
+      poll: poll,
+      children: [
+        for (final opt in sorted)
+          _OptionTile(
+            option: opt,
+            total: poll.totalVotes,
+            highlight: poll.myOptionIds.contains(opt.id),
+            leading: lead != null && opt.id == lead.id,
+          ),
+        if (poll.myOptionIds.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 2, bottom: 6),
+            child: Text(
+              'Outlined in orange: your pick',
+              style: TextStyle(
+                fontSize: 11,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -384,153 +730,78 @@ class _VoteCardState extends State<_VoteCard> {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final poll = widget.poll;
+    final voted = poll.myOptionIds.isNotEmpty;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: colors.outlineVariant),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  poll.title,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: colors.onSurface,
-                  ),
-                ),
+    return _PollCardShell(
+      poll: poll,
+      headerTrailing: voted
+          ? Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: _green.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(999),
               ),
-              if (!poll.isOpen)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.check_circle_rounded, size: 12, color: _green),
+                  SizedBox(width: 4),
+                  Text(
+                    'Voted',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      color: _green,
+                    ),
                   ),
-                  decoration: BoxDecoration(
-                    color: colors.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.lock_outline,
-                        size: 11,
-                        color: colors.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 3),
-                      Text(
-                        'Closed',
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w600,
-                          color: colors.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 2),
-          Text(
-            '${DateFormat.MMMd().format(poll.startDate)} – ${DateFormat.yMMMd().format(poll.endDate)}',
-            style: TextStyle(fontSize: 11.5, color: colors.onSurfaceVariant),
-          ),
-          const SizedBox(height: 14),
-          for (final opt in poll.options) ...[
-            if (poll.isOpen)
-              InkWell(
-                onTap: () => _toggle(opt.id),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 20,
-                        height: 20,
-                        decoration: BoxDecoration(
-                          color: _draft.contains(opt.id)
-                              ? AppColors.primary
-                              : Colors.transparent,
-                          border: Border.all(
-                            color: _draft.contains(opt.id)
-                                ? AppColors.primary
-                                : colors.outlineVariant,
-                            width: 2,
-                          ),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: _draft.contains(opt.id)
-                            ? const Icon(
-                                Icons.check,
-                                size: 14,
-                                color: Colors.white,
-                              )
-                            : null,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _OptionBar(
-                          option: opt,
-                          total: poll.totalVotes,
-                          selected: _draft.contains(opt.id),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              )
-            else
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: _OptionBar(
-                  option: opt,
-                  total: poll.totalVotes,
-                  selected: poll.myOptionIds.contains(opt.id),
-                ),
+                ],
               ),
-          ],
-          if (poll.isOpen) ...[
-            const SizedBox(height: 8),
+            )
+          : null,
+      footer: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 2, 14, 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              voted
+                  ? 'Changed your mind? Tap options, then update.'
+                  : 'Tap one or more options, then submit.',
+              style: TextStyle(fontSize: 11.5, color: colors.onSurfaceVariant),
+            ),
+            const SizedBox(height: 10),
             SizedBox(
-              width: double.infinity,
-              height: 44,
-              child: ElevatedButton(
+              height: 46,
+              child: FilledButton(
                 onPressed: (!_hasChanges || _submitting) ? null : _submit,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: colors.onSurface,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppRadius.sm + 2),
-                  ),
-                ),
                 child: _submitting
-                    ? SizedBox(
+                    ? const SizedBox(
                         height: 18,
                         width: 18,
-                        child: AppLoader(strokeWidth: 2, color: colors.surface),
+                        child: AppLoader(strokeWidth: 2, color: Colors.white),
                       )
                     : Text(
-                        poll.myOptionIds.isNotEmpty
+                        voted
                             ? 'Update my vote'
-                            : 'Submit vote',
-                        style: TextStyle(
-                          color: colors.surface,
-                          fontWeight: FontWeight.w600,
-                        ),
+                            : _draft.isEmpty
+                            ? 'Pick an option'
+                            : 'Submit vote (${_draft.length})',
                       ),
               ),
             ),
           ],
-        ],
+        ),
       ),
+      children: [
+        for (final opt in poll.options)
+          _OptionTile(
+            option: opt,
+            total: poll.totalVotes,
+            highlight: _draft.contains(opt.id),
+            checked: _draft.contains(opt.id),
+            onTap: () => _toggle(opt.id),
+          ),
+      ],
     );
   }
 }
@@ -628,227 +899,135 @@ class _ManagePollCardState extends State<_ManagePollCard> {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final poll = widget.poll;
-    PollOption? leading;
-    for (final o in poll.options) {
-      if (leading == null || o.voteCount > leading.voteCount) leading = o;
-    }
+    final lead = _leader(poll);
+    final ranked = List.of(poll.options)
+      ..sort((a, b) => b.voteCount.compareTo(a.voteCount));
+    final leadPct = lead == null || poll.totalVotes == 0
+        ? 0
+        : (lead.voteCount / poll.totalVotes * 100).round();
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: colors.outlineVariant),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+    Widget action(
+      IconData icon,
+      String label,
+      VoidCallback? onTap, {
+      Color? color,
+    }) {
+      final fg = color ?? colors.onSurface;
+      return Expanded(
+        child: InkWell(
+          onTap: _busy ? null : onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              poll.title,
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: colors.onSurface,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color:
-                                  (poll.isActive
-                                          ? _green
-                                          : colors.onSurfaceVariant)
-                                      .withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Text(
-                              poll.isActive ? 'Open' : 'Closed',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: poll.isActive
-                                    ? _green
-                                    : colors.onSurfaceVariant,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (poll.isActive)
-                      TextButton(
-                        onPressed: _busy ? null : _closePoll,
-                        child: const Text(
-                          'Close',
-                          style: TextStyle(fontSize: 12.5),
-                        ),
-                      ),
-                    IconButton(
-                      onPressed: _busy ? null : _deletePoll,
-                      icon: const Icon(
-                        Icons.delete_outline,
-                        size: 19,
-                        color: _red,
-                      ),
-                    ),
-                  ],
-                ),
+                Icon(icon, size: 18, color: fg),
+                const SizedBox(height: 3),
                 Text(
-                  '${DateFormat.MMMd().format(poll.startDate)} – ${DateFormat.yMMMd().format(poll.endDate)}',
+                  label,
                   style: TextStyle(
                     fontSize: 11.5,
-                    color: colors.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                    color: fg,
                   ),
                 ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${poll.totalVotes}',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: colors.onSurface,
-                          ),
-                        ),
-                        Text(
-                          'TOTAL VOTES',
-                          style: TextStyle(
-                            fontSize: 9.5,
-                            fontWeight: FontWeight.w700,
-                            color: colors.onSurfaceVariant,
-                            letterSpacing: 0.3,
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (leading != null && poll.totalVotes > 0) ...[
-                      const SizedBox(width: 20),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              leading.optionName,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: colors.onSurface,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            Text(
-                              'LEADING OPTION',
-                              style: TextStyle(
-                                fontSize: 9.5,
-                                fontWeight: FontWeight.w700,
-                                color: colors.onSurfaceVariant,
-                                letterSpacing: 0.3,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 12),
-                for (final opt in poll.options) ...[
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: _OptionBar(
-                      option: opt,
-                      total: poll.totalVotes,
-                      selected: false,
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
+        ),
+      );
+    }
+
+    return _PollCardShell(
+      poll: poll,
+      footer: Column(
+        children: [
           Divider(height: 1, color: colors.outlineVariant),
           Row(
             children: [
-              Expanded(
-                child: InkWell(
-                  onTap: _openVoters,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.people_outline,
-                          size: 16,
-                          color: colors.onSurfaceVariant,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          'View voters',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: colors.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              Container(width: 1, height: 40, color: colors.outlineVariant),
-              Expanded(
-                child: InkWell(
-                  onTap: _openShare,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.share_outlined,
-                          size: 16,
-                          color: colors.onSurfaceVariant,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Share',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: colors.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+              action(Icons.people_outline_rounded, 'Voters', _openVoters),
+              action(Icons.ios_share_rounded, 'Share', _openShare),
+              if (poll.isActive)
+                action(Icons.lock_clock_outlined, 'Close', _closePoll),
+              action(
+                Icons.delete_outline_rounded,
+                'Delete',
+                _deletePoll,
+                color: _red,
               ),
             ],
           ),
         ],
       ),
+      children: [
+        // Leader highlight.
+        Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: colors.primaryContainer,
+            borderRadius: BorderRadius.circular(AppRadius.sm + 2),
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.emoji_events_rounded,
+                color: AppColors.primary,
+                size: 22,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      poll.isOpen ? 'LEADING' : 'WINNER',
+                      style: const TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.6,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      lead?.optionName ?? 'No votes yet',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w800,
+                        color: colors.onSurface,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (lead != null)
+                Text(
+                  '$leadPct%',
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.primary,
+                  ),
+                ),
+            ],
+          ),
+        ),
+        for (var i = 0; i < ranked.length; i++)
+          _OptionTile(
+            option: ranked[i],
+            total: poll.totalVotes,
+            rank: i + 1,
+            leading: lead != null && ranked[i].id == lead.id,
+          ),
+        if (_busy)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 6),
+            child: LinearProgressIndicator(minHeight: 2),
+          ),
+      ],
     );
   }
 }

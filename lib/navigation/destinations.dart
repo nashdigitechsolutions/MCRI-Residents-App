@@ -8,6 +8,7 @@ import '../screens/events_screen.dart';
 import '../screens/house_rules_screen.dart';
 import '../screens/rooms_screen.dart';
 import '../screens/weekly_menu_screen.dart';
+import '../screens/admin/admin_approvals_screen.dart';
 
 /// One secondary area of the app. The drawer and the "All services" hub are
 /// both built from [appDestinations], so they can never drift apart.
@@ -78,6 +79,14 @@ final List<AppDestination> appDestinations = [
     caption: 'Manage residents, roles and requests',
     routeName: 'admin_dashboard',
     builder: () => const AdminDashboardScreen(),
+    adminOnly: true,
+  ),
+  AppDestination(
+    icon: Icons.how_to_reg_outlined,
+    label: 'New accounts',
+    caption: 'Approve people who signed up',
+    routeName: 'admin_approvals',
+    builder: () => const AdminApprovalsScreen(),
     adminOnly: true,
   ),
   AppDestination(

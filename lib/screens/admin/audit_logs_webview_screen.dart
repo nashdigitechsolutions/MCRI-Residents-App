@@ -31,11 +31,11 @@ class _AuditLogsWebViewScreenState extends State<AuditLogsWebViewScreen> {
           onNavigationRequest: (request) {
             final uri = Uri.tryParse(request.url);
             // This is the actual fix: the website's /auth/callback always
-            // tries to hand off to the app first via this custom scheme —
+            // tries to hand off to the app first via this custom scheme -
             // which is exactly what our own AndroidManifest.xml registers
             // us to intercept. Blocking the navigation here (rather than
             // letting the OS see it) means Android never gets the chance
-            // to bounce back into this app — the website's own 1.2s
+            // to bounce back into this app - the website's own 1.2s
             // fallback timer then just continues normally, inside this
             // WebView, as if no app were installed at all.
             if (uri == null || uri.scheme == AppConfig.deepLinkScheme) {
@@ -53,7 +53,7 @@ class _AuditLogsWebViewScreenState extends State<AuditLogsWebViewScreen> {
             setState(() => _loading = false);
             // Once the callback page has done its job and redirected to
             // the logged-in homepage, move on to the actual audit logs
-            // page — this only fires once, after the real handoff completes.
+            // page - this only fires once, after the real handoff completes.
             final uri = Uri.tryParse(url);
             if (!_navigatedToTarget &&
                 uri != null &&

@@ -168,13 +168,13 @@ class _SlidePuzzleCaptchaState extends State<SlidePuzzleCaptcha>
         final pieceX = done ? targetX : _x;
 
         final (msg, msgColor) = switch (_status) {
-          _Status.success => ('Verified — the piece fits!', _good),
+          _Status.success => ('Verified, the piece fits!', _good),
           _Status.fail => (
-            'Not quite — here is a new puzzle',
+            'Not quite, here is a new puzzle',
             AppColors.dangerDark,
           ),
           _Status.locked => (
-            'Too many tries — wait a few seconds',
+            'Too many tries, wait a few seconds',
             AppColors.dangerDark,
           ),
           _Status.dragging => (

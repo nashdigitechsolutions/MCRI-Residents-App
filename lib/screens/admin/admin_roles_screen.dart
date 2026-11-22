@@ -86,7 +86,7 @@ class _AdminRolesScreenState extends State<AdminRolesScreen> {
       _notify(e.message, isError: true);
     } catch (e) {
       _notify(
-        'Could not update role — endpoint may not exist yet',
+        'Could not update role, endpoint may not exist yet',
         isError: true,
       );
     } finally {

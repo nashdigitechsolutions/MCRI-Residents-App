@@ -137,9 +137,9 @@ class _WeeklyMenuScreenState extends State<WeeklyMenuScreen> {
 
   String _shareText(WeeklyMenuEntry e) {
     String line(String emoji, String label, String v) =>
-        '$emoji *$label:* ${v.isEmpty ? '—' : v}';
+        '$emoji *$label:* ${v.isEmpty ? '-' : v}';
     return [
-      '🍽️ *MCRI menu — ${e.dayOfWeek}*',
+      '🍽️ *MCRI menu: ${e.dayOfWeek}*',
       line('🍳', 'Breakfast', e.breakfast),
       line('🥗', 'Lunch', e.lunch),
       line('🍲', 'Dinner', e.dinner),
@@ -570,7 +570,7 @@ class _WeeklyMenuScreenState extends State<WeeklyMenuScreen> {
                                   const SizedBox(width: 6),
                                   Expanded(
                                     child: Text(
-                                      dish.isEmpty ? '—' : dish,
+                                      dish.isEmpty ? '-' : dish,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(

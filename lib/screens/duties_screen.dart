@@ -70,7 +70,7 @@ class _DutiesScreenState extends State<DutiesScreen>
     super.dispose();
   }
 
-  /// Each source loads and fails independently — a broken roster route
+  /// Each source loads and fails independently - a broken roster route
   /// (e.g. not deployed yet) never blanks out duties, and vice versa.
   Future<void> _loadAll() async {
     if (!mounted) return;
@@ -112,7 +112,7 @@ class _DutiesScreenState extends State<DutiesScreen>
 
       _notify(
         e.statusCode == 404
-            ? "Duty roster route not found — check it's registered on the backend"
+            ? "Duty roster route not found, check it's registered on the backend"
             : 'Could not load the duty roster',
         isError: true,
       );
@@ -136,7 +136,7 @@ class _DutiesScreenState extends State<DutiesScreen>
         );
       } catch (e) {
         if (!mounted) return;
-        // Non-fatal — room column just shows blank.
+        // Non-fatal - room column just shows blank.
       }
 
       if (!mounted) return;
@@ -296,7 +296,7 @@ class _DutiesScreenState extends State<DutiesScreen>
   List<RosterEntry> _rosterForDay(int dayNum) =>
       _filteredRoster.where((r) => r.dayOfWeek == dayNum).toList();
 
-  /// The "live popup" — shows exactly who's on duty for a given day, with a
+  /// The "live popup" - shows exactly who's on duty for a given day, with a
   /// pulsing "LIVE" indicator in the sheet header when that day is today.
   void _openDaySheet(int dayNum, String dayName) {
     final isToday = dayNum == _todayDayOfWeek;
@@ -444,7 +444,7 @@ class _DutiesScreenState extends State<DutiesScreen>
                       Icons.celebration_outlined,
                       done.isEmpty
                           ? 'No duties assigned to you'
-                          : 'All caught up — nice work!',
+                          : 'All caught up, nice work!',
                     )
                   else
                     for (final d in upcoming) _dutyCard(colors, d, mine: true),
@@ -490,7 +490,7 @@ class _DutiesScreenState extends State<DutiesScreen>
                       _emptyCard(
                         colors,
                         Icons.assignment_outlined,
-                        'Nothing assigned yet — tap "Assign duty".',
+                        'Nothing assigned yet, tap "Assign duty".',
                       )
                     else
                       for (final status in [
@@ -1383,7 +1383,7 @@ class _AssignDutySheetState extends State<_AssignDutySheet> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Assign to (tap to select — more than one allowed)',
+                      'Assign to (tap to select, more than one allowed)',
                       style: TextStyle(
                         fontSize: 11.5,
                         color: colors.onSurfaceVariant,

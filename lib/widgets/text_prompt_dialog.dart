@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 /// dispose(), i.e. only after the closing animation has finished. Disposing
 /// it from the caller (e.g. `showDialog(...).whenComplete(c.dispose)`) runs
 /// while the TextField is still on screen animating out, which trips
-/// Flutter's "_dependents.isEmpty" assertion — the red error screen.
+/// Flutter's "_dependents.isEmpty" assertion - the red error screen.
 Future<String?> showTextPrompt(
   BuildContext context, {
   required String title,

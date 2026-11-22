@@ -1,5 +1,5 @@
 // Renders every screen on a small phone (320x640) with the largest font scale
-// the app allows (1.25) and fails on any RenderFlex overflow — i.e. any view
+// the app allows (1.25) and fails on any RenderFlex overflow - i.e. any view
 // that would overlap or clip.
 import 'dart:convert';
 import 'dart:io';

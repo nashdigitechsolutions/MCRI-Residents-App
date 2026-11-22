@@ -5,6 +5,7 @@ import '../../widgets/app_refresh.dart';
 import '../weekly_menu_screen.dart';
 import '../duties_screen.dart';
 import '../equipment_screen.dart';
+import 'admin_approvals_screen.dart';
 import 'admin_profiles_screen.dart';
 import '../../widgets/ui.dart';
 import '../../widgets/charts.dart';
@@ -280,7 +281,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         const PageHeading(
           eyebrow: 'Administration',
           title: 'Residence at a glance',
-          subtitle: 'Live numbers — pull down to refresh',
+          subtitle: 'Live numbers, pull down to refresh',
         ),
         const SizedBox(height: 14),
         GridView.count(
@@ -336,6 +337,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               onPressed: _openBroadcastSheet,
             ),
             ActionChip(
+              avatar: const Icon(Icons.how_to_reg_outlined, size: 18),
+              label: const Text('Approve accounts'),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const AdminApprovalsScreen()),
+              ),
+            ),
+            ActionChip(
               avatar: const Icon(Icons.groups_2_outlined, size: 18),
               label: const Text('All profiles'),
               onPressed: () => Navigator.of(context).push(
@@ -363,7 +371,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         ChartCard(
           title: 'Requests & reports per week',
           subtitle: diff == 0
-              ? '$thisWeek this week — same as last week'
+              ? '$thisWeek this week, same as last week'
               : '$thisWeek this week · ${diff > 0 ? '+' : ''}$diff vs last week',
           chart: ColumnChart(data: weekly),
           table: [for (final (l, v) in weekly) ('Week of $l', '$v')],
@@ -495,14 +503,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   _buildSectionCard(
                     colors,
                     empty: _pendingMaintenance.isEmpty,
-                    emptyLabel: 'No open requests — all caught up.',
+                    emptyLabel: 'No open requests, all caught up.',
                     rows: _pendingMaintenance.map((req) {
                       final rowKey = 'm-${req['request_id']}';
                       final busy = _busyId?.startsWith('$rowKey:') ?? false;
                       return _ActionRow(
                         title: req['title'] as String? ?? '',
                         subtitle:
-                            '${req['priority'] ?? ''} priority · room #${req['room_id'] ?? '—'}',
+                            '${req['priority'] ?? ''} priority · room #${req['room_id'] ?? '-'}',
                         actions: [
                           _smallOutlined(
                             'Start',

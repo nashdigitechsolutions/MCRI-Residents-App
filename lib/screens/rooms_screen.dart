@@ -99,7 +99,7 @@ class _RoomsScreenState extends State<RoomsScreen> {
     setState(() => _busyResidentId = resident.residentId);
     try {
       // PATCH .../unassign clears room_id without touching the resident
-      // record — plain DELETE /residents/:id is now a REAL delete (the two
+      // record - plain DELETE /residents/:id is now a REAL delete (the two
       // routes no longer collide, so they're intentionally different actions).
       await ApiService.patch('/residents/${resident.residentId}/unassign', {});
       if (mounted) _notify('Moved to unassigned');
@@ -999,7 +999,7 @@ class _AssignSheetState extends State<_AssignSheet> {
             if (selectedResident?.roomNumber != null) ...[
               const SizedBox(height: 4),
               Text(
-                'Currently in Room ${selectedResident!.roomNumber} — this will move them.',
+                'Currently in Room ${selectedResident!.roomNumber}, this will move them.',
                 style: const TextStyle(fontSize: 11, color: _amber),
               ),
             ],
@@ -1021,7 +1021,7 @@ class _AssignSheetState extends State<_AssignSheet> {
                   value: room.roomId,
                   enabled: !full,
                   child: Text(
-                    'Room ${room.roomNumber} — ${room.currentOccupancy}/${room.maxCapacity}${full ? ' (full)' : ''}',
+                    'Room ${room.roomNumber} · ${room.currentOccupancy}/${room.maxCapacity}${full ? ' (full)' : ''}',
                     style: TextStyle(
                       color: full ? colors.onSurfaceVariant : colors.onSurface,
                     ),

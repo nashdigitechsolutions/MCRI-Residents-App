@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// MCRI design tokens — orange, black and white.
+/// MCRI design tokens - orange, black and white.
 ///
 /// Visual language: clean white surfaces, hairline grey borders, 12px radius
 /// cards, bold black headings, small uppercase orange "eyebrow" labels and a

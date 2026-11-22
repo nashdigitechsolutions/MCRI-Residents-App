@@ -36,14 +36,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     _load();
 
     // Live delivery: a broadcast notification arrives over the socket the
-    // instant an admin sends one — prepend it immediately rather than
+    // instant an admin sends one - prepend it immediately rather than
     // waiting for the next manual refresh.
     _onNotification = (payload) {
       final raw = payload['data']?['notification'] ?? payload['notification'];
       if (raw == null) return;
       final incoming = AppNotification.fromJson({
         // The broadcast payload is the bare `notifications` row shape
-        // (title/message/notification_id/created_at) — no
+        // (title/message/notification_id/created_at) - no
         // user_notification_id or is_read yet, since that's a separate
         // per-user table row. We use notification_id as a stand-in key and
         // default is_read to false, matching a freshly-inserted recipient row.

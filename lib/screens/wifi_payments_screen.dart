@@ -10,7 +10,7 @@ import '../widgets/app_loader.dart';
 import '../widgets/app_refresh.dart';
 import '../widgets/ui.dart';
 
-/// WiFi payments — tracks which residents have paid for WiFi this month and
+/// WiFi payments - tracks which residents have paid for WiFi this month and
 /// which haven't. COMING SOON: the API doesn't store WiFi payments yet, so
 /// this is the finished layout with the real resident list and every status
 /// shown as "not tracked yet". Nothing here is invented or saved.
@@ -301,7 +301,7 @@ class _WifiPaymentsScreenState extends State<WifiPaymentsScreen> {
   }
 
   /// Paid vs not-paid split. With nothing recorded the bar is an empty track
-  /// and the counts read "—" rather than a made-up number.
+  /// and the counts read " - " rather than a made-up number.
   Widget _summary(ColorScheme colors) {
     Widget figure(IconData icon, Color color, String label) => Expanded(
       child: Row(
@@ -316,7 +316,7 @@ class _WifiPaymentsScreenState extends State<WifiPaymentsScreen> {
           ),
           const SizedBox(width: 6),
           Text(
-            '—',
+            '-',
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w800,
@@ -407,7 +407,7 @@ class _WifiPaymentsScreenState extends State<WifiPaymentsScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  me == null ? 'You\'re not listed as a resident yet.' : 'Not tracked yet — you\'ll see "Paid" or "Not paid" here.',
+                  me == null ? 'You\'re not listed as a resident yet.' : 'Not tracked yet, you\'ll see "Paid" or "Not paid" here.',
                   style: TextStyle(
                     fontSize: 12.5,
                     color: colors.onSurfaceVariant,

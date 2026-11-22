@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 
-/// Small uppercase orange label above a heading — "DEPARTMENT INFORMATION".
+/// Small uppercase orange label above a heading - "DEPARTMENT INFORMATION".
 class Eyebrow extends StatelessWidget {
   final String text;
   const Eyebrow(this.text, {super.key});

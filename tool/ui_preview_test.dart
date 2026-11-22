@@ -76,7 +76,7 @@ void main() {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Loader — 16 / 24 / 40 / 72 px, plus white on orange'),
+                  const Text('Loader, 16 / 24 / 40 / 72 px, plus white on orange'),
                   const SizedBox(height: 8),
                   Row(
                     children: [
@@ -101,7 +101,7 @@ void main() {
                     ],
                   ),
                   const SizedBox(height: 18),
-                  const Text('Switches (on / off / disabled on / disabled off), checkboxes, outline — light'),
+                  const Text('Switches (on / off / disabled on / disabled off), checkboxes, outline, light'),
                   const SizedBox(height: 6),
                   _switches(false),
                   const SizedBox(height: 10),

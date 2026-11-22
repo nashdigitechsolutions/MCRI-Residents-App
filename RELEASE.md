@@ -1,4 +1,4 @@
-# Release checklist — MCRI Residents
+# Release checklist - MCRI Residents
 
 ## 1. One-time setup
 

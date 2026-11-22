@@ -40,6 +40,10 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _submitting = false;
   String? _error;
   bool _needsVerification = false;
+
+  /// Why sign-in was blocked: 'email_unverified', 'pending_approval' or
+  /// 'account_rejected'. Picks the notice shown instead of the form.
+  String _blockedCode = 'email_unverified';
   bool _failedAttempt = false;
 
   /// After 3 wrong passwords a puzzle is required before the next try.
@@ -223,12 +227,19 @@ class _LoginScreenState extends State<LoginScreen> {
           // Non-fatal: the user is signed in, just without biometrics.
         }
       }
-      // No navigation needed — main.dart swaps to MainShell automatically.
+      // No navigation needed - main.dart swaps to MainShell automatically.
     } on ApiException catch (e) {
       TextInput.finishAutofillContext(shouldSave: false);
       if (!mounted) return;
-      if (e.statusCode == 403) {
-        setState(() => _needsVerification = true);
+      if (e.statusCode == 403 &&
+          (e.code == null ||
+              e.code == 'email_unverified' ||
+              e.code == 'pending_approval' ||
+              e.code == 'account_rejected')) {
+        setState(() {
+          _blockedCode = e.code ?? 'email_unverified';
+          _needsVerification = true;
+        });
       } else {
         setState(() {
           _error = e.message;
@@ -479,6 +490,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildVerificationNotice() {
+    if (_blockedCode != 'email_unverified') return _buildApprovalNotice();
     return Column(
       children: [
         Container(
@@ -528,6 +540,62 @@ class _LoginScreenState extends State<LoginScreen> {
                     decoration: TextDecoration.underline,
                   ),
                 ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextButton(
+          onPressed: () => setState(() => _needsVerification = false),
+          child: const Text('Back to sign in'),
+        ),
+      ],
+    );
+  }
+
+  /// Verified, but an admin hasn't approved the account yet (or declined it).
+  Widget _buildApprovalNotice() {
+    final rejected = _blockedCode == 'account_rejected';
+    final fg = rejected ? AppColors.dangerDark : AppColors.primaryDeep;
+    return Column(
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: rejected ? const Color(0xFFFEF2F2) : AppColors.primarySoft,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(
+              color: rejected
+                  ? const Color(0xFFFECACA)
+                  : AppColors.primaryBorder,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    rejected
+                        ? Icons.block_rounded
+                        : Icons.hourglass_top_rounded,
+                    size: 18,
+                    color: fg,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    rejected ? 'Account not approved' : 'Waiting for approval',
+                    style: TextStyle(fontWeight: FontWeight.w700, color: fg),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                rejected
+                    ? 'An admin declined this account. If you think this is a mistake, please contact the residence office.'
+                    : "Thanks for signing up! An admin checks every new account to keep the residence private. We'll email you as soon as you're approved.",
+                style: TextStyle(fontSize: 12.5, color: fg, height: 1.45),
               ),
             ],
           ),

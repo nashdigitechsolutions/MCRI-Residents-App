@@ -121,7 +121,7 @@ class AuthProvider extends ChangeNotifier {
       'password': password,
       'username': username,
     });
-    // Signup doesn't log the user in — same as the web app.
+    // Signup doesn't log the user in - same as the web app.
   }
 
   /// [serverReachable] is false when the token is already known to be dead

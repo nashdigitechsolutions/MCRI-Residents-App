@@ -373,7 +373,7 @@ class _HomeScreenState extends State<HomeScreen> with LiveRefresh {
                             colors,
                             Icons.campaign_outlined,
                             isAdmin
-                                ? 'No announcements yet — create one to keep everyone in the loop.'
+                                ? 'No announcements yet, create one to keep everyone in the loop.'
                                 : 'No announcements yet.',
                           )
                         else
@@ -1030,7 +1030,7 @@ class _AnnouncementCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Avatar column — like WhatsApp sender icon
+          // Avatar column - like WhatsApp sender icon
           Column(
             children: [
               CircleAvatar(
