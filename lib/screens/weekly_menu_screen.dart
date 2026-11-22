@@ -6,6 +6,7 @@ import '../widgets/app_refresh.dart';
 
 import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
 
 import '../models/weekly_menu_entry.dart';
@@ -222,8 +223,12 @@ class _WeeklyMenuScreenState extends State<WeeklyMenuScreen> {
                           TextButton.icon(
                             onPressed: () =>
                                 shareToWhatsApp(_shareText(selected)),
-                            icon: const Icon(Icons.share_outlined, size: 18),
-                            label: const Text('Share'),
+                            icon: const FaIcon(
+                              FontAwesomeIcons.whatsapp,
+                              size: 18,
+                              color: Color(0xFF25D366),
+                            ),
+                            label: const Text('WhatsApp'),
                           ),
                         ],
                       ),

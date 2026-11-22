@@ -22,28 +22,17 @@ import '../widgets/ui.dart';
 import 'conversation_detail_screen.dart';
 import 'profile_screen.dart';
 
-const _appVersion = '1.1.0';
+const _appVersion = '1.2.0';
 
 /// Planned features shown in Settings > Coming soon. Kept in step with the
 /// website's list (src/pages/Settings.tsx). WiFi payments is listed
 /// separately because it already has a preview screen.
 const comingSoonFeatures = <(IconData, String, String)>[
   (
-    Icons.alarm_rounded,
-    'Event reminders',
-    'A nudge before events you RSVP\'d to',
-  ),
-  (
-    Icons.local_laundry_service_outlined,
-    'Laundry booking',
-    'Reserve a washing machine slot',
-  ),
-  (
     Icons.badge_outlined,
     'Visitor sign-in',
     'Register guests before they arrive',
   ),
-  (Icons.search_rounded, 'Lost & found', 'Post and claim lost items'),
   (
     Icons.verified_user_outlined,
     'Two-step sign-in',
@@ -77,6 +66,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool? _bioAvailable;
   bool _bioEnabled = false;
   bool _bioBusy = false;
+  bool _typesOpen = false;
 
   @override
   void initState() {
@@ -275,48 +265,54 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onChanged: (v) =>
                   _update((x) => x.copyWith(chatNotifications: v)),
             ),
-            _SwitchRow(
-              icon: Icons.campaign_outlined,
-              label: 'Announcements',
-              value: p.notifyAnnouncements,
+            _TypesGroup(
+              open: _typesOpen,
               enabled: p.notificationsEnabled,
-              onChanged: (v) =>
-                  _update((x) => x.copyWith(notifyAnnouncements: v)),
-            ),
-            _SwitchRow(
-              icon: Icons.ramen_dining_outlined,
-              label: 'Meal polls',
-              value: p.notifyPolls,
-              enabled: p.notificationsEnabled,
-              onChanged: (v) => _update((x) => x.copyWith(notifyPolls: v)),
-            ),
-            _SwitchRow(
-              icon: Icons.build_outlined,
-              label: 'Equipment & repairs',
-              value: p.notifyEquipment,
-              enabled: p.notificationsEnabled,
-              onChanged: (v) => _update((x) => x.copyWith(notifyEquipment: v)),
-            ),
-            _SwitchRow(
-              icon: Icons.calendar_today_outlined,
-              label: 'Events',
-              value: p.notifyEvents,
-              enabled: p.notificationsEnabled,
-              onChanged: (v) => _update((x) => x.copyWith(notifyEvents: v)),
-            ),
-            _SwitchRow(
-              icon: Icons.cleaning_services_outlined,
-              label: 'Duties',
-              value: p.notifyDuties,
-              enabled: p.notificationsEnabled,
-              onChanged: (v) => _update((x) => x.copyWith(notifyDuties: v)),
-            ),
-            _SwitchRow(
-              icon: Icons.restaurant_outlined,
-              label: 'Weekly menu',
-              value: p.notifyMenu,
-              enabled: p.notificationsEnabled,
-              onChanged: (v) => _update((x) => x.copyWith(notifyMenu: v)),
+              onToggle: () => setState(() => _typesOpen = !_typesOpen),
+              types: [
+                (
+                  Icons.campaign_outlined,
+                  'Announcements',
+                  p.notifyAnnouncements,
+                  (v) => _update((x) => x.copyWith(notifyAnnouncements: v)),
+                ),
+                (
+                  Icons.ramen_dining_outlined,
+                  'Meal polls',
+                  p.notifyPolls,
+                  (v) => _update((x) => x.copyWith(notifyPolls: v)),
+                ),
+                (
+                  Icons.calendar_today_outlined,
+                  'Events and reminders',
+                  p.notifyEvents,
+                  (v) => _update((x) => x.copyWith(notifyEvents: v)),
+                ),
+                (
+                  Icons.build_outlined,
+                  'Equipment & repairs',
+                  p.notifyEquipment,
+                  (v) => _update((x) => x.copyWith(notifyEquipment: v)),
+                ),
+                (
+                  Icons.cleaning_services_outlined,
+                  'Duties',
+                  p.notifyDuties,
+                  (v) => _update((x) => x.copyWith(notifyDuties: v)),
+                ),
+                (
+                  Icons.restaurant_outlined,
+                  'Weekly menu',
+                  p.notifyMenu,
+                  (v) => _update((x) => x.copyWith(notifyMenu: v)),
+                ),
+                (
+                  Icons.travel_explore_rounded,
+                  'Lost & found',
+                  p.notifyLostFound,
+                  (v) => _update((x) => x.copyWith(notifyLostFound: v)),
+                ),
+              ],
             ),
             _SwitchRow(
               icon: Icons.web_asset_rounded,
@@ -760,6 +756,105 @@ class _SoonRow extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// "Notification types" row that expands to one switch per category, so the
+/// long list stays out of the way until it's needed.
+class _TypesGroup extends StatelessWidget {
+  final bool open;
+  final bool enabled;
+  final VoidCallback onToggle;
+  final List<(IconData, String, bool, ValueChanged<bool>)> types;
+
+  const _TypesGroup({
+    required this.open,
+    required this.enabled,
+    required this.onToggle,
+    required this.types,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final on = types.where((t) => t.$3).length;
+    return Column(
+      children: [
+        InkWell(
+          onTap: onToggle,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 13, 12, 13),
+            child: Row(
+              children: [
+                _RowIcon(Icons.tune_rounded, enabled: enabled),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Notification types',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: colors.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        enabled
+                            ? '$on of ${types.length} on'
+                            : 'Turn on push notifications first',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                AnimatedRotation(
+                  turns: open ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: Icon(
+                    Icons.expand_more_rounded,
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        AnimatedSize(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          alignment: Alignment.topCenter,
+          child: open
+              ? Container(
+                  color: colors.surfaceContainerHighest.withValues(alpha: 0.35),
+                  child: Column(
+                    children: [
+                      for (final t in types) ...[
+                        Divider(
+                          height: 1,
+                          indent: 52,
+                          color: colors.outlineVariant,
+                        ),
+                        _SwitchRow(
+                          icon: t.$1,
+                          label: t.$2,
+                          value: t.$3,
+                          enabled: enabled,
+                          onChanged: t.$4,
+                        ),
+                      ],
+                    ],
+                  ),
+                )
+              : const SizedBox(width: double.infinity),
+        ),
+      ],
     );
   }
 }

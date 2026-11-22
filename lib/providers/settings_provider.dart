@@ -25,6 +25,7 @@ class Preferences {
   final bool notifyEvents;
   final bool notifyDuties;
   final bool notifyMenu;
+  final bool notifyLostFound;
   final bool inAppBanners; // app-only: drop-down banner while app is open
 
   // Privacy
@@ -45,6 +46,7 @@ class Preferences {
     this.notifyEvents = true,
     this.notifyDuties = true,
     this.notifyMenu = true,
+    this.notifyLostFound = true,
     this.inAppBanners = true,
     this.showOnlineStatus = true,
     this.extra = const {},
@@ -63,6 +65,7 @@ class Preferences {
     'notify_events',
     'notify_duties',
     'notify_menu',
+    'notify_lost_found',
     'in_app_banners',
     'show_online_status',
   };
@@ -89,6 +92,7 @@ class Preferences {
       notifyEvents: b('notify_events'),
       notifyDuties: b('notify_duties'),
       notifyMenu: b('notify_menu'),
+      notifyLostFound: b('notify_lost_found'),
       inAppBanners: b('in_app_banners'),
       showOnlineStatus: b('show_online_status'),
       extra: {
@@ -112,6 +116,7 @@ class Preferences {
     'notify_events': notifyEvents,
     'notify_duties': notifyDuties,
     'notify_menu': notifyMenu,
+    'notify_lost_found': notifyLostFound,
     'in_app_banners': inAppBanners,
     'show_online_status': showOnlineStatus,
   };
@@ -129,6 +134,7 @@ class Preferences {
     bool? notifyEvents,
     bool? notifyDuties,
     bool? notifyMenu,
+    bool? notifyLostFound,
     bool? inAppBanners,
     bool? showOnlineStatus,
   }) {
@@ -145,6 +151,7 @@ class Preferences {
       notifyEvents: notifyEvents ?? this.notifyEvents,
       notifyDuties: notifyDuties ?? this.notifyDuties,
       notifyMenu: notifyMenu ?? this.notifyMenu,
+      notifyLostFound: notifyLostFound ?? this.notifyLostFound,
       inAppBanners: inAppBanners ?? this.inAppBanners,
       showOnlineStatus: showOnlineStatus ?? this.showOnlineStatus,
       extra: extra,

@@ -103,6 +103,12 @@ class _EventsScreenState extends State<EventsScreen> {
       await ApiService.post('/events/${event.eventId}/attendees', {
         'attendance_status': status,
       });
+      if ((status == 'going' || status == 'maybe') &&
+          event.startDate.isAfter(
+            DateTime.now().add(const Duration(minutes: 60)),
+          )) {
+        _notify('Saved. We\'ll remind you an hour before it starts.');
+      }
     } catch (e) {
       _notify('Could not save your response', isError: true);
       _loadEvents();

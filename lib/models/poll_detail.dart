@@ -9,6 +9,9 @@ class PollDetail {
   final List<PollOption> options;
   final List<int> myOptionIds;
 
+  /// 'none', 'daily' or 'weekly'.
+  final String recurrence;
+
   PollDetail({
     required this.pollId,
     required this.title,
@@ -17,6 +20,7 @@ class PollDetail {
     required this.isActive,
     required this.options,
     required this.myOptionIds,
+    this.recurrence = 'none',
   });
 
   factory PollDetail.fromJson(Map<String, dynamic> json) {
@@ -34,10 +38,19 @@ class PollDetail {
       myOptionIds: (json['my_option_ids'] as List? ?? [])
           .map((id) => id is String ? int.parse(id) : id as int)
           .toList(),
+      recurrence: json['recurrence'] as String? ?? 'none',
     );
   }
 
   int get totalVotes => options.fold(0, (sum, o) => sum + o.voteCount);
 
-  bool get isOpen => isActive && endDate.isAfter(DateTime.now());
+  /// Opens in the future (only admins can see these).
+  bool get isScheduled => isActive && startDate.isAfter(DateTime.now());
+
+  bool get isOpen =>
+      isActive &&
+      !startDate.isAfter(DateTime.now()) &&
+      endDate.isAfter(DateTime.now());
+
+  bool get repeats => recurrence == 'daily' || recurrence == 'weekly';
 }

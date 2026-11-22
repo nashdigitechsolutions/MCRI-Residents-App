@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../navigation/app_navigator.dart';
 import '../screens/admin/admin_approvals_screen.dart';
+import '../screens/lost_found_screen.dart';
 import '../screens/admin/admin_dashboard_screen.dart';
 import '../screens/conversation_detail_screen.dart';
 import '../screens/duties_screen.dart';
@@ -113,6 +114,11 @@ class NotificationRouter {
         push(const WeeklyMenuScreen(), 'weekly_menu');
       case 'house_rules':
         push(const HouseRulesScreen(), 'house_rules');
+      case 'lost_found':
+        push(
+          LostFoundScreen(highlightItemId: _int(data['item_id'])),
+          'lost_found',
+        );
       case 'admin_approvals':
         push(const AdminApprovalsScreen(), 'admin_approvals');
       case 'admin_users' || 'admin':
@@ -140,10 +146,15 @@ class NotificationRouter {
         t.startsWith('update on your report')) {
       return {'screen': 'equipment'};
     }
-    if (t.contains('event')) return {'screen': 'event'};
+    if (t.contains('event') || t.startsWith('starting soon')) {
+      return {'screen': 'event'};
+    }
     if (t.contains('duty') || t.contains('duties')) return {'screen': 'duties'};
     if (t.contains('menu')) return {'screen': 'weekly_menu'};
     if (t.contains('room')) return {'screen': 'rooms'};
+    if (t.startsWith('lost:') || t.startsWith('found:')) {
+      return {'screen': 'lost_found'};
+    }
     if (t.contains('to approve')) return {'screen': 'admin_approvals'};
     if (t.contains('signed up')) return {'screen': 'admin_users'};
     if (t.startsWith('welcome')) return {'screen': 'profile'};

@@ -5,6 +5,7 @@ import '../widgets/app_refresh.dart';
 import 'package:mcri_residents_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
@@ -103,7 +104,8 @@ class _PollsScreenState extends State<PollsScreen> with LiveRefresh {
     final isAdmin = context.watch<AuthProvider>().user?.roleId == 1;
 
     final openPolls = _polls.where((p) => p.isOpen).toList();
-    final pastPolls = _polls.where((p) => !p.isOpen).toList();
+    final scheduledPolls = _polls.where((p) => p.isScheduled).toList();
+    final pastPolls = _polls.where((p) => !p.isOpen && !p.isScheduled).toList();
 
     return Scaffold(
       appBar: AppBar(),
@@ -114,14 +116,18 @@ class _PollsScreenState extends State<PollsScreen> with LiveRefresh {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
                 children: isAdmin
-                    ? _buildAdminList(openPolls, pastPolls)
+                    ? _buildAdminList(openPolls, pastPolls, scheduledPolls)
                     : _buildResidentList(openPolls, pastPolls),
               ),
             ),
     );
   }
 
-  List<Widget> _buildAdminList(List<PollDetail> open, List<PollDetail> past) {
+  List<Widget> _buildAdminList(
+    List<PollDetail> open,
+    List<PollDetail> past,
+    List<PollDetail> scheduled,
+  ) {
     final votes = open.fold<int>(0, (s, p) => s + p.totalVotes);
     final widgets = <Widget>[
       PageHeading(
@@ -182,6 +188,7 @@ class _PollsScreenState extends State<PollsScreen> with LiveRefresh {
     }
 
     section('Open now', open);
+    section('Scheduled', scheduled);
     section('Closed', past);
     return widgets;
   }
@@ -244,6 +251,9 @@ class _PollsScreenState extends State<PollsScreen> with LiveRefresh {
 
 /// "Closes in 2d 4h", "Closes in 35 min", "Closed Mar 4".
 String _closesLabel(PollDetail poll) {
+  if (poll.isScheduled) {
+    return 'Opens ${DateFormat('EEE d MMM, HH:mm').format(poll.startDate)}';
+  }
   if (!poll.isOpen) return 'Closed ${DateFormat.MMMd().format(poll.endDate)}';
   final left = poll.endDate.difference(DateTime.now());
   if (left.inDays >= 1) {
@@ -252,15 +262,6 @@ String _closesLabel(PollDetail poll) {
   }
   if (left.inHours >= 1) return 'Closes in ${left.inHours}h';
   return 'Closes in ${left.inMinutes.clamp(1, 59)} min';
-}
-
-/// The option with the most votes, or null when nobody has voted.
-PollOption? _leader(PollDetail poll) {
-  PollOption? best;
-  for (final o in poll.options) {
-    if (best == null || o.voteCount > best.voteCount) best = o;
-  }
-  return (best == null || best.voteCount == 0) ? null : best;
 }
 
 class _SectionLabel extends StatelessWidget {
@@ -307,7 +308,12 @@ class _StatusPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final open = poll.isOpen;
-    final fg = open ? _green : colors.onSurfaceVariant;
+    final scheduled = poll.isScheduled;
+    final fg = open
+        ? _green
+        : scheduled
+        ? AppColors.primary
+        : colors.onSurfaceVariant;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -324,7 +330,11 @@ class _StatusPill extends StatelessWidget {
               decoration: BoxDecoration(color: fg, shape: BoxShape.circle),
             )
           else
-            Icon(Icons.lock_outline_rounded, size: 11, color: fg),
+            Icon(
+              scheduled ? Icons.schedule_rounded : Icons.lock_outline_rounded,
+              size: 11,
+              color: fg,
+            ),
           const SizedBox(width: 5),
           Text(
             _closesLabel(poll),
@@ -366,14 +376,12 @@ class _MealBadge extends StatelessWidget {
 
 /// One option as a tile whose background fills with its share of the vote.
 /// Used for voting (with a check circle), for admin results and for past
-/// results. [highlight] marks the resident's pick or the leading option.
+/// results. [highlight] marks the resident's pick.
 class _OptionTile extends StatelessWidget {
   final PollOption option;
   final int total;
   final bool highlight;
   final bool? checked; // null = not a voting tile
-  final bool leading;
-  final int? rank;
   final VoidCallback? onTap;
 
   const _OptionTile({
@@ -381,8 +389,6 @@ class _OptionTile extends StatelessWidget {
     required this.total,
     this.highlight = false,
     this.checked,
-    this.leading = false,
-    this.rank,
     this.onTap,
   });
 
@@ -391,7 +397,7 @@ class _OptionTile extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     final share = total > 0 ? option.voteCount / total : 0.0;
     final pct = (share * 100).round();
-    final accent = highlight || leading;
+    final accent = highlight;
     final borderColor = highlight ? AppColors.primary : colors.outlineVariant;
 
     return Padding(
@@ -457,22 +463,6 @@ class _OptionTile extends StatelessWidget {
                               : null,
                         ),
                         const SizedBox(width: 12),
-                      ] else if (rank != null) ...[
-                        SizedBox(
-                          width: 22,
-                          child: Text(
-                            '$rank',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w800,
-                              color: leading
-                                  ? AppColors.primary
-                                  : colors.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
                       ],
                       Expanded(
                         child: Text(
@@ -486,14 +476,6 @@ class _OptionTile extends StatelessWidget {
                           ),
                         ),
                       ),
-                      if (leading) ...[
-                        const Icon(
-                          Icons.emoji_events_rounded,
-                          size: 15,
-                          color: AppColors.primary,
-                        ),
-                        const SizedBox(width: 6),
-                      ],
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
@@ -584,6 +566,27 @@ class _PollCardShell extends StatelessWidget {
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           _StatusPill(poll),
+                          if (poll.repeats)
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.repeat_rounded,
+                                  size: 13,
+                                  color: colors.onSurfaceVariant,
+                                ),
+                                const SizedBox(width: 3),
+                                Text(
+                                  poll.recurrence == 'daily'
+                                      ? 'Daily'
+                                      : 'Weekly',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: colors.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
                           Text(
                             '${poll.totalVotes} vote${poll.totalVotes == 1 ? '' : 's'}',
                             style: TextStyle(
@@ -621,18 +624,14 @@ class _ResultCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final lead = _leader(poll);
-    final sorted = List.of(poll.options)
-      ..sort((a, b) => b.voteCount.compareTo(a.voteCount));
     return _PollCardShell(
       poll: poll,
       children: [
-        for (final opt in sorted)
+        for (final opt in poll.options)
           _OptionTile(
             option: opt,
             total: poll.totalVotes,
             highlight: poll.myOptionIds.contains(opt.id),
-            leading: lead != null && opt.id == lead.id,
           ),
         if (poll.myOptionIds.isNotEmpty)
           Padding(
@@ -895,16 +894,89 @@ class _ManagePollCardState extends State<_ManagePollCard> {
     );
   }
 
+  // Who voted, for what, and when. Loaded on first open, refreshed when the
+  // poll's vote count changes (live updates rebuild this card).
+  bool _showVotes = false;
+  List<PollVoteRow>? _votes;
+  bool _votesLoading = false;
+  int _votesForTotal = -1;
+
+  Future<void> _loadVotes() async {
+    setState(() => _votesLoading = true);
+    try {
+      final data = await ApiService.get('/polls/${widget.poll.pollId}/votes');
+      if (!mounted) return;
+      final rows =
+          (data as List)
+              .map((j) => PollVoteRow.fromJson(j as Map<String, dynamic>))
+              .toList()
+            ..sort((a, b) {
+              final at = a.votedAt, bt = b.votedAt;
+              if (at == null || bt == null) return 0;
+              return bt.compareTo(at); // newest first
+            });
+      setState(() {
+        _votes = rows;
+        _votesForTotal = widget.poll.totalVotes;
+      });
+    } catch (_) {
+      widget.notify('Could not load votes', isError: true);
+    } finally {
+      if (mounted) setState(() => _votesLoading = false);
+    }
+  }
+
+  void _toggleVotes() {
+    setState(() => _showVotes = !_showVotes);
+    if (_showVotes && _votesForTotal != widget.poll.totalVotes) _loadVotes();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ManagePollCard old) {
+    super.didUpdateWidget(old);
+    if (_showVotes && widget.poll.totalVotes != _votesForTotal) _loadVotes();
+  }
+
+  Future<void> _stopRepeating() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Stop repeating?'),
+        content: const Text(
+          'This poll will run as normal, but no new round will be created after it.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Stop repeating'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    setState(() => _busy = true);
+    try {
+      await ApiService.post('/polls/${widget.poll.pollId}/recurrence', {
+        'recurrence': 'none',
+      });
+      widget.notify('This poll won\'t repeat');
+      widget.onChanged();
+    } on ApiException catch (e) {
+      widget.notify(e.message, isError: true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final poll = widget.poll;
-    final lead = _leader(poll);
-    final ranked = List.of(poll.options)
-      ..sort((a, b) => b.voteCount.compareTo(a.voteCount));
-    final leadPct = lead == null || poll.totalVotes == 0
-        ? 0
-        : (lead.voteCount / poll.totalVotes * 100).round();
+    final timeFmt = DateFormat('EEE d MMM, HH:mm');
 
     Widget action(
       IconData icon,
@@ -945,9 +1017,9 @@ class _ManagePollCardState extends State<_ManagePollCard> {
           Divider(height: 1, color: colors.outlineVariant),
           Row(
             children: [
-              action(Icons.people_outline_rounded, 'Voters', _openVoters),
+              action(Icons.people_outline_rounded, 'By option', _openVoters),
               action(Icons.ios_share_rounded, 'Share', _openShare),
-              if (poll.isActive)
+              if (poll.isActive && !poll.isScheduled)
                 action(Icons.lock_clock_outlined, 'Close', _closePoll),
               action(
                 Icons.delete_outline_rounded,
@@ -960,68 +1032,147 @@ class _ManagePollCardState extends State<_ManagePollCard> {
         ],
       ),
       children: [
-        // Leader highlight.
-        Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: colors.primaryContainer,
-            borderRadius: BorderRadius.circular(AppRadius.sm + 2),
-          ),
-          child: Row(
-            children: [
-              const Icon(
-                Icons.emoji_events_rounded,
-                color: AppColors.primary,
-                size: 22,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      poll.isOpen ? 'LEADING' : 'WINNER',
-                      style: const TextStyle(
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.6,
-                        color: AppColors.primary,
-                      ),
+        if (poll.repeats)
+          Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.fromLTRB(12, 6, 4, 6),
+            decoration: BoxDecoration(
+              color: colors.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(AppRadius.sm + 2),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.repeat_rounded,
+                  size: 16,
+                  color: colors.onSurfaceVariant,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    poll.recurrence == 'daily'
+                        ? 'Repeats every day with the same options'
+                        : 'Repeats every week with the same options',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: colors.onSurfaceVariant,
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      lead?.optionName ?? 'No votes yet',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                TextButton(
+                  onPressed: _busy ? null : _stopRepeating,
+                  child: const Text('Stop', style: TextStyle(fontSize: 12.5)),
+                ),
+              ],
+            ),
+          ),
+        for (final opt in poll.options)
+          _OptionTile(option: opt, total: poll.totalVotes),
+
+        // Who voted, for what, and when.
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: poll.totalVotes == 0 ? null : _toggleVotes,
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.how_to_vote_outlined,
+                    size: 17,
+                    color: colors.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      poll.totalVotes == 0
+                          ? 'No votes yet'
+                          : 'Who voted, for what, and when',
                       style: TextStyle(
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
                         color: colors.onSurface,
                       ),
                     ),
+                  ),
+                  if (poll.totalVotes > 0)
+                    Icon(
+                      _showVotes
+                          ? Icons.expand_less_rounded
+                          : Icons.expand_more_rounded,
+                      color: colors.onSurfaceVariant,
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (_showVotes)
+          if (_votesLoading && _votes == null)
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: Center(child: AppLoader(size: 22)),
+            )
+          else
+            for (final v in _votes ?? <PollVoteRow>[])
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 5),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CircleAvatar(
+                      radius: 13,
+                      backgroundColor: colors.primaryContainer,
+                      child: Text(
+                        v.residentName.isNotEmpty
+                            ? v.residentName[0].toUpperCase()
+                            : '?',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            v.residentName,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: colors.onSurface,
+                            ),
+                          ),
+                          Text(
+                            [
+                              v.optionName,
+                              if (v.roomNumber != null) 'Room ${v.roomNumber}',
+                            ].join(' · '),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: colors.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (v.votedAt != null)
+                      Text(
+                        timeFmt.format(v.votedAt!.toLocal()),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
                   ],
                 ),
               ),
-              if (lead != null)
-                Text(
-                  '$leadPct%',
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.primary,
-                  ),
-                ),
-            ],
-          ),
-        ),
-        for (var i = 0; i < ranked.length; i++)
-          _OptionTile(
-            option: ranked[i],
-            total: poll.totalVotes,
-            rank: i + 1,
-            leading: lead != null && ranked[i].id == lead.id,
-          ),
         if (_busy)
           const Padding(
             padding: EdgeInsets.only(bottom: 6),
@@ -1256,14 +1407,19 @@ class _VotersSheetState extends State<_VotersSheet> {
                                             overflow: TextOverflow.ellipsis,
                                           ),
                                         ),
-                                        if (v.roomNumber != null)
-                                          Text(
-                                            'Room ${v.roomNumber}',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              color: colors.onSurfaceVariant,
-                                            ),
+                                        Text(
+                                          [
+                                            if (v.roomNumber != null)
+                                              'Room ${v.roomNumber}',
+                                            if (v.votedAt != null)
+                                              DateFormat('EEE HH:mm')
+                                                  .format(v.votedAt!.toLocal()),
+                                          ].join(' · '),
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: colors.onSurfaceVariant,
                                           ),
+                                        ),
                                       ],
                                     ),
                                   ),
@@ -1450,7 +1606,7 @@ class _ShareSheetState extends State<_ShareSheet> {
                             color: colors.surface,
                           ),
                         )
-                      : const Icon(Icons.chat_bubble_outline, size: 18),
+                      : const FaIcon(FontAwesomeIcons.whatsapp, size: 20),
                   label: const Text('Share to WhatsApp'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF25D366),
@@ -1526,6 +1682,9 @@ class _NewPollSheetState extends State<_NewPollSheet> {
   bool _submitting = false;
   String? _error;
 
+  /// 'none', 'daily' or 'weekly': repeat with the same options.
+  String _recurrence = 'none';
+
   @override
   void dispose() {
     _titleController.dispose();
@@ -1588,6 +1747,7 @@ class _NewPollSheetState extends State<_NewPollSheet> {
         'start_date': _start!.toUtc().toIso8601String(),
         'end_date': _end!.toUtc().toIso8601String(),
         'options': options,
+        'recurrence': _recurrence,
       });
       if (mounted) Navigator.of(context).pop(true);
     } on ApiException catch (e) {
@@ -1723,6 +1883,63 @@ class _NewPollSheetState extends State<_NewPollSheet> {
                         ),
                       ],
                     ),
+                    if (_start != null && _start!.isAfter(DateTime.now()))
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.schedule_rounded,
+                              size: 15,
+                              color: AppColors.primary,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'Scheduled: residents see it and get notified when it opens.',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: colors.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    const SizedBox(height: 14),
+                    Text(
+                      'Repeat',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SegmentedButton<String>(
+                      showSelectedIcon: false,
+                      segments: const [
+                        ButtonSegment(value: 'none', label: Text('Once')),
+                        ButtonSegment(value: 'daily', label: Text('Daily')),
+                        ButtonSegment(value: 'weekly', label: Text('Weekly')),
+                      ],
+                      selected: {_recurrence},
+                      onSelectionChanged: (s) =>
+                          setState(() => _recurrence = s.first),
+                    ),
+                    if (_recurrence != 'none')
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text(
+                          _recurrence == 'daily'
+                              ? 'A new round opens every day at the same time, with the same options.'
+                              : 'A new round opens every week at the same time, with the same options.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: colors.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
                     const SizedBox(height: 14),
                     Text(
                       'Options',

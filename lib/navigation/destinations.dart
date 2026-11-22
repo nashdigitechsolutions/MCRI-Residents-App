@@ -6,6 +6,7 @@ import '../screens/duties_screen.dart';
 import '../screens/equipment_screen.dart';
 import '../screens/events_screen.dart';
 import '../screens/house_rules_screen.dart';
+import '../screens/lost_found_screen.dart';
 import '../screens/rooms_screen.dart';
 import '../screens/weekly_menu_screen.dart';
 import '../screens/admin/admin_approvals_screen.dart';
@@ -44,6 +45,13 @@ final List<AppDestination> appDestinations = [
     caption: 'Community calendar and RSVPs',
     routeName: 'events',
     builder: () => const EventsScreen(),
+  ),
+  AppDestination(
+    icon: Icons.travel_explore_rounded,
+    label: 'Lost & found',
+    caption: 'Lost something? Found something?',
+    routeName: 'lost_found',
+    builder: () => const LostFoundScreen(),
   ),
   AppDestination(
     icon: Icons.build_outlined,
